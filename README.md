@@ -42,3 +42,4 @@ Typically, every EMR integration with a Scribe vendor requires a custom API impl
 
 ---
 *Maintained by the Medical Scribe Alliance.*
+
