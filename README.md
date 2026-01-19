@@ -1,45 +1,183 @@
-# Medical Scribe Alliance: Scribe EMR Protocol (SEP)
-## Scribe EMR Protocol
+# MedScribeAlliance Protocol
 
-**SEP** is a standard protocol designed to enable seamless interoperability between Electronic Medical Record (EMR) systems and AI Scribe solutions.
+[![Protocol Version](https://img.shields.io/badge/protocol-v0.1-blue.svg)](./spec/01-introduction.md)
+[![Status](https://img.shields.io/badge/status-draft-orange.svg)]()
+[![License](https://img.shields.io/badge/license-CC%20BY%204.0-green.svg)](./LICENSE)
 
-Typically, every EMR integration with a Scribe vendor requires a custom API implementation. SEP unifies this by defining a foundational protocol—similar to how [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) standardizes AI tool context.
+**MedScribeAlliance** is an open interoperability protocol that enables Electronic Medical Record (EMR) systems to integrate with any compliant Medical Scribe service for voice-to-structured-medical-text conversion.
 
-## 📚 Documentation
+## 🎯 Vision
 
-1.  **[Architecture Overview](docs/architecture.md)**: Conceptual model, roles, and high-level workflows.
-2.  **[Protocol Specification](docs/protocol-spec.md)**: The normative HTTP API specification (Endpoints, Headers, Webhooks).
-3.  **[Data Models](docs/data-models.md)**: JSON Schemas for requests, responses, and template definitions.
+Create a unified standard for medical scribe integrations, allowing:
 
-### 📘 Advanced Guides
-*   **[Integration Guide](docs/guides/integration-guide.md)**: Wire traces, resilience patterns, and timeouts.
-*   **[Security & Compliance](docs/security.md)**: HIPAA, mTLS, and Data Retention.
-*   **[Error Catalog](docs/errors.md)**: Comprehensive list of error codes and recovery actions.
+- **EMR vendors** to integrate once and work with multiple scribe providers
+- **Scribe services** to reach more customers without custom integrations per EMR
+- **Healthcare providers** to choose the best scribe service for their needs
+- **Ecosystem innovation** through standardized interfaces
 
+## 🏗️ Architecture
 
-## 🚀 Key Features
+```
+┌─────────────────┐         ┌─────────────────────┐         ┌─────────────────┐
+│                 │         │                     │         │                 │
+│    Physician    │────────▶│     EMR Client      │────────▶│  Scribe Service │
+│                 │         │                     │         │                 │
+│   (Voice In)    │         │  (MedScribeAlliance │◀────────│  (Structured    │
+│                 │         │      Protocol)      │         │   Data Out)     │
+└─────────────────┘         └─────────────────────┘         └─────────────────┘
+```
 
-*   **Standardized Discovery**: EMRs can dynamically query what "Templates" (note types) a Scribe supports.
-*   **Authentication Agnostic**: Works with standard OAuth2 / Bearer token flows.
-*   **Flexible Modalities**:
-    *   **Sync**: For short, immediate commands.
-    *   **Async**: For standard consultations (Webhook callback).
-    *   **Chunked**: For real-time streaming or poor network conditions.
-*   **Structured Output**: Defines how to return clinical notes, FHIR bundles, and raw transcripts.
+## 📋 Key Features
 
-## 🛠 Getting Started for Implementers
+- **Simple Discovery** - `.well-known/medscribealliance` endpoint for capability discovery
+- **Flexible Auth** - API Keys for B2B, OIDC for B2C integrations
+- **Streaming Support** - Chunked audio upload for real-time capture
+- **Template-based Extraction** - SOAP notes, medications, discharge summaries, and custom templates
+- **Async Results** - Webhook delivery with signature verification
+- **Multi-language** - Built for India's diverse language landscape
 
-### For EMR Developers
-1.  Implement the **Discovery** flow (`GET /capabilities`) to show available tools in your UI.
-2.  Implement the **Authentication** handshake provided by your Scribe partner.
-3.  Choose your **Audio Submission** strategy (Async is recommended for robustness).
-4.  Set up a **Webhook Listener** to receive completed notes.
+## 📖 Specification
 
-### For Scribe Vendors
-1.  Expose the SEP-compliant endpoints.
-2.  Map your internal note types to the SEP `Template` structure.
-3.  Ensure your system can handle the standard JSON payloads for context and output.
+| Document | Description |
+|----------|-------------|
+| [Introduction](./spec/01-introduction.md) | Purpose, scope, and conformance requirements |
+| [Architecture](./spec/02-architecture.md) | Integration patterns and high-level flow |
+| [Versioning](./spec/03-versioning.md) | Protocol version negotiation |
+| [Discovery](./spec/04-discovery.md) | Well-known endpoint and capability schema |
+| [Authentication](./spec/05-authentication.md) | API Key and OIDC authentication |
+| [Sessions](./spec/06-sessions.md) | Session lifecycle management |
+| [Audio Ingestion](./spec/07-audio-ingestion.md) | Audio upload methods and formats |
+| [Templates](./spec/08-templates.md) | Template listing and standard templates |
+| [Extraction](./spec/09-extraction.md) | Response structure and output formats |
+| [Webhooks](./spec/10-webhooks.md) | Event delivery and signature verification |
+| [Errors](./spec/11-errors.md) | Error codes and handling |
+| [Security](./spec/12-security.md) | Security considerations |
+
+## 🚀 Quick Start
+
+### For EMR Implementers
+
+1. **Discover capabilities**
+   ```bash
+   curl https://scribe.example.com/.well-known/medscribealliance
+   ```
+
+2. **Create a session**
+   ```bash
+   curl -X POST https://api.scribe.example.com/v1/sessions \
+     -H "X-API-Key: sk_live_xxx" \
+     -H "Content-Type: application/json" \
+     -d '{"templates": ["soap", "medications"]}'
+   ```
+
+3. **Upload audio**
+   ```bash
+   curl -X POST https://api.scribe.example.com/v1/sessions/{id}/audio \
+     -H "X-API-Key: sk_live_xxx" \
+     -H "Content-Type: audio/webm;codecs=opus" \
+     --data-binary @recording.webm
+   ```
+
+4. **End session & receive results via webhook**
+   ```bash
+   curl -X POST https://api.scribe.example.com/v1/sessions/{id}/end \
+     -H "X-API-Key: sk_live_xxx"
+   ```
+
+### For Scribe Service Implementers
+
+1. Implement the [Discovery](./spec/04-discovery.md) endpoint
+2. Support at least one [Authentication](./spec/05-authentication.md) method
+3. Implement [Session](./spec/06-sessions.md) and [Audio](./spec/07-audio-ingestion.md) endpoints
+4. Return structured data per [Extraction](./spec/09-extraction.md) spec
+5. Deliver results via [Webhooks](./spec/10-webhooks.md)
+
+## 📁 Repository Structure
+
+```
+medscribealliance/
+├── README.md                 # This file
+├── LICENSE                   # CC BY 4.0
+├── CONTRIBUTING.md           # Contribution guidelines
+├── CHANGELOG.md              # Version history
+├── spec/                     # Protocol specification
+│   ├── 01-introduction.md
+│   ├── 02-architecture.md
+│   ├── 03-versioning.md
+│   ├── 04-discovery.md
+│   ├── 05-authentication.md
+│   ├── 06-sessions.md
+│   ├── 07-audio-ingestion.md
+│   ├── 08-templates.md
+│   ├── 09-extraction.md
+│   ├── 10-webhooks.md
+│   ├── 11-errors.md
+│   └── 12-security.md
+├── examples/                 # Example payloads and flows
+│   ├── discovery-document.json
+│   ├── session-flow.md
+│   └── webhook-payloads.json
+└── schemas/                  # JSON schemas (future)
+    └── README.md
+```
+
+## 🤝 Contributing
+
+We welcome contributions from:
+
+- EMR vendors
+- Scribe service providers
+- Healthcare IT professionals
+- Standards organizations
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+### How to Contribute
+
+1. **Open an Issue** - For bugs, questions, or feature requests
+2. **Submit a PR** - For spec clarifications or additions
+3. **Join Discussions** - Participate in GitHub Discussions
+4. **Implement & Feedback** - Build implementations and share learnings
+
+## 📋 Roadmap
+
+### v0.1 (Current - Draft)
+- [x] Core session lifecycle
+- [x] Audio ingestion (chunked & single)
+- [x] Template-based extraction
+- [x] Webhook delivery
+- [x] API Key & OIDC authentication
+
+### v0.2 (Planned)
+- [ ] Real-time transcription streaming
+- [ ] FHIR bundle output mapping
+- [ ] Template creation API
+- [ ] Conformance test suite
+
+### v1.0 (Future)
+- [ ] Stable API freeze
+- [ ] Reference implementations
+- [ ] Certification program
+
+## 📜 License
+
+This specification is released under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+
+You are free to:
+- **Share** — copy and redistribute the material
+- **Adapt** — remix, transform, and build upon the material
+
+Under the following terms:
+- **Attribution** — You must give appropriate credit
+
+## 📞 Contact
+
+- **Working Group:** MedScribeAlliance Working Group
+- **Email:** [TBD]
+- **Discussions:** [GitHub Discussions](../../discussions)
 
 ---
-*Maintained by the Medical Scribe Alliance.*
 
+<p align="center">
+  <i>Building the future of medical documentation interoperability</i>
+</p>
