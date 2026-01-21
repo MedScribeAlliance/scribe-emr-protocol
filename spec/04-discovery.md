@@ -56,14 +56,14 @@ Cache-Control: max-age=3600
   
   "endpoints": {
     "base_url": "https://api.scribe.example.com/v1",
-    "authorization_endpoint": "https://auth.scribe.example.com/oauth/authorize",
-    "token_endpoint": "https://auth.scribe.example.com/oauth/token"
   },
   
   "authentication": {
     "supported_methods": ["api_key", "oidc"],
     "oidc": {
       "issuer": "https://auth.scribe.example.com",
+      "authorization_endpoint": "https://auth.scribe.example.com/oauth/authorize",
+      "token_endpoint": "https://auth.scribe.example.com/oauth/token"
       "scopes_supported": ["openid", "profile"]
     }
   },
