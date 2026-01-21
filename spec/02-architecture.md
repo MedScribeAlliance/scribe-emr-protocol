@@ -9,10 +9,14 @@
 The protocol involves three primary actors:
 
 ```
+        |─────────────────────────────────────────────────────────────|
+        |                                                             ▼
 ┌─────────────────┐         ┌─────────────────────┐         ┌─────────────────┐
 │                 │         │                     │         │                 │
 │    End User     │────────▶│     EMR Client      │────────▶│  Scribe Service │
-│   (Physician)   │         │                     │         │                 │
+│   (Physician/   |         |                     |         |                 |
+|    Medical      |         |                     |         |                 |
+|   Practitioner) │         │                     │         │                 │
 │                 │         │                     │◀────────│                 │
 └─────────────────┘         └─────────────────────┘         └─────────────────┘
                                      │
@@ -60,7 +64,7 @@ EMR integrates directly with Scribe Service using API keys. The EMR is the custo
 
 ### 2.2.2 User-Authorized Integration (B2C)
 
-End users authenticate directly with the Scribe Service via OIDC. Users have a direct relationship and billing with the Scribe Service.
+End users authenticate directly with the Scribe Service via OIDC. Users have a direct relationship and billing with the Scribe Service and EMR service.
 
 ```
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
@@ -80,7 +84,8 @@ End users authenticate directly with the Scribe Service via OIDC. Users have a d
 - User authenticates directly with Scribe
 - User has direct billing relationship
 - EMR acts as OIDC client (relying party)
-- User controls their scribe subscription
+- Scribe service will act as OIDC Provider
+- User controls their scribe & emr subscription
 
 **Use Cases:**
 - Marketplace model
@@ -96,26 +101,26 @@ EMR embeds a Scribe SDK in their frontend. Audio capture and upload happens clie
 │                    EMR Frontend                       │
 │                                                       │
 │   ┌───────────────────────────────────────────────┐   │
-│   │           Scribe SDK (iframe/JS)              │   │
+│   │           Scribe SDK (iframe/JS/native SDK)   │   │
 │   │                                               │   │
-│   │   ┌─────────┐    ┌────────┐    ┌─────────┐   │   │
-│   │   │  Audio  │───▶│ Upload │───▶│ Process │   │   │
-│   │   │ Capture │    │        │    │         │   │   │
-│   │   └─────────┘    └────────┘    └────┬────┘   │   │
-│   │                                     │        │   │
-│   └─────────────────────────────────────┼────────┘   │
-│                                         │            │
-│              postMessage / callback     │            │
-│                                         ▼            │
-│   ┌───────────────────────────────────────────────┐  │
-│   │           EMR Form Fill Logic                 │  │
-│   └───────────────────────────────────────────────┘  │
+│   │   ┌─────────┐    ┌────────┐    ┌─────────┐    │   │
+│   │   │  Audio  │───▶│ Upload │───▶│ Process │    │   │
+│   │   │ Capture │    │        │    │         │    │   │
+│   │   └─────────┘    └────────┘    └────┬────┘    │   │
+│   │                                     │         │   │
+│   └─────────────────────────────────────┼─────────┘   │
+│                                         │             │
+│              postMessage / callback     │             │
+│                                         ▼             │
+│   ┌───────────────────────────────────────────────┐   │
+│   │           EMR Form Fill Logic                 │   │
+│   └───────────────────────────────────────────────┘   │
 │                                                       │
 └───────────────────────────────────────────────────────┘
 ```
 
 **Characteristics:**
-- Audio captured in browser
+- Audio captured in browser or apps
 - Direct upload to Scribe from client
 - Results delivered via postMessage or callback
 - Minimal EMR backend involvement
@@ -145,8 +150,8 @@ EMR embeds a Scribe SDK in their frontend. Audio capture and upload happens clie
      │◀────────────────────────────────│                                   │
      │         {session_id}            │                                   │
      │                                 │──────────────────────────────────▶│
-     │                                 │   Webhook: session.started        │
-     │                                 │                                   │
+     │                                 │   Webhook/callbacks:              │
+     │                                 │   session.started                 │
      │  3. POST /sessions/{id}/audio   │                                   │
      │     [audio chunks]              │                                   │
      │────────────────────────────────▶│                                   │
@@ -158,13 +163,14 @@ EMR embeds a Scribe SDK in their frontend. Audio capture and upload happens clie
      │◀────────────────────────────────│                                   │
      │         {processing}            │                                   │
      │                                 │──────────────────────────────────▶│
-     │                                 │   Webhook: session.ended          │
+     │                                 │   Webhook/callbacks: session.ended│
      │                                 │                                   │
      │                                 │         [Processing...]           │
      │                                 │                                   │
      │                                 │──────────────────────────────────▶│
-     │                                 │   Webhook: session.completed      │
-     │                                 │   {templates, transcript}         │
+     │                                 │   Webhook/callbacks:              │
+     │                                 │   session.completed               |
+     │                                 |     {templates, transcript}       |
      │                                 │                                   │
      │  5. GET /sessions/{id}          │                                   │
      │     (optional polling)          │                                   │
