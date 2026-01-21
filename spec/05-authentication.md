@@ -226,6 +226,24 @@ grant_type=refresh_token
 - Store refresh tokens securely
 - Implement token refresh as background process
 
+### Browser-Based Clients: Cookie-Based Session Management
+
+For browser-based clients (SPAs, embedded widgets), Scribe Services MAY implement cookie-based session management as an alternative to explicit refresh token handling. In this model:
+
+- The Scribe Service issues HTTP-only, Secure cookies upon successful authentication
+- Token refresh occurs transparently via cookie-authenticated requests to a dedicated refresh endpoint
+- The browser automatically includes credentials, eliminating client-side token storage and refresh logic
+
+This approach simplifies EMR integration for client-side implementations by:
+
+1. Removing the need for secure token storage in browser environments
+2. Eliminating explicit refresh token management in client code
+3. Leveraging browser-native credential handling
+
+**Implementation Note:** Cookie-based session management is an optional mechanism at the discretion of the Scribe Service provider. When implemented, cookies MUST use appropriate security attributes (`HttpOnly`, `Secure`, `SameSite=Strict` or `SameSite=Lax`) and comply with the security requirements in [Section 12](./12-security.md).
+
+EMR clients integrating with Scribe Services that support this mechanism SHOULD consult the provider's implementation documentation for endpoint details and CORS configuration requirements.
+
 ---
 
 ## 5.4 Authentication Selection
