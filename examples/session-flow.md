@@ -68,6 +68,7 @@ curl -X POST https://api.scribe.example.com/v1/sessions \
     "templates": ["soap", "medications"],
     "model": "pro",
     "language_hint": "en",
+    "upload_type": "chunked",
     "additional_data": {
       "emr_encounter_id": "enc_12345",
       "emr_patient_id": "pat_67890"

@@ -77,6 +77,7 @@ Content-Type: application/json
   "model": "pro",
   "language_hint": "hi",
   "transcript_language": "en",
+  "upload_type": "chunked",
   "additional_data": {
     "emr_encounter_id": "enc_123",
     "emr_patient_id": "pat_456"
@@ -92,6 +93,7 @@ Content-Type: application/json
 | `model` | string | No | Model ID from discovery. Default: service decides |
 | `language_hint` | string | No | ISO 639-1 language hint for audio input. Auto-detected if not provided |
 | `transcript_language` | string | No | ISO 639-1 code for transcript output language. Defaults to detected input language |
+| `upload_type` | string | No | Audio upload method: `chunked` or `single`. Default: `chunked` |
 | `additional_data` | object | No | Pass-through data returned in webhooks and responses |
 
 ### Response

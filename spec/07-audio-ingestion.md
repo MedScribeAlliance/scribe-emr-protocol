@@ -42,7 +42,7 @@ Use single file upload when you have a complete, pre-recorded audio file. This i
 ```
 
 - One HTTP request with the entire audio file
-- Use `X-Upload-Type: complete` header
+- Requires `upload_type: "single"` in session creation request
 - File name is preserved as-is
 
 ### Chunked/Multiple File Upload
@@ -188,129 +188,183 @@ Files Received (any order):     Processing Order:
 
 ---
 
-## 7.3 Upload Endpoint
+## 7.3 Upload URL
 
-**Endpoint:** `POST /sessions/{session_id}/audio`
+The upload URL is provided dynamically in the session creation response (`upload_url` field). This URL is where clients upload audio files for the session.
 
-**Required:** Yes
+### Dynamic Upload URL
 
-Uploads audio data to an active session.
+The `upload_url` returned by `POST /sessions` can be:
+
+| URL Type | Description | Example |
+|----------|-------------|---------|
+| **Scribe API Endpoint** | Direct upload to Scribe Service | `https://api.scribe.example.com/v1/sessions/ses_abc123/audio` |
+| **AWS S3 Pre-signed URL** | Direct upload to S3 bucket | `https://bucket.s3.amazonaws.com/sessions/ses_abc123/?X-Amz-Signature=...` |
+| **Google Cloud Storage** | Direct upload to GCS bucket | `https://storage.googleapis.com/bucket/sessions/ses_abc123/?X-Goog-Signature=...` |
+| **Azure Blob Storage** | Direct upload to Azure container | `https://account.blob.core.windows.net/container/ses_abc123?sv=...&sig=...` |
+
+### Session Creation Response
+
+```http
+POST /sessions HTTP/1.1
+Host: api.scribe.example.com
+Authorization: X-API-Key sk_live_xxx
+Content-Type: application/json
+
+{
+  "templates": ["soap", "medications"],
+  "upload_type": "chunked"
+}
+```
+
+```http
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "session_id": "ses_abc123def456",
+  "status": "created",
+  "created_at": "2025-01-19T10:30:00Z",
+  "expires_at": "2025-01-19T11:30:00Z",
+  "upload_url": "https://storage.googleapis.com/scribe-uploads/ses_abc123def456/?X-Goog-Signature=..."
+}
+```
+
+**Important:** Clients MUST use the exact `upload_url` provided in the response. Do not construct or modify this URL.
 
 ---
 
-## 7.3 Chunked Upload
+## 7.4 Chunked Upload
 
 For streaming or progressive audio capture. Ideal for real-time recording scenarios.
 
 ### Requirements
 
 - Each chunk MUST be ≤20 seconds duration
-- Chunks MUST be uploaded sequentially (by `X-Chunk-Index`)
+- Chunks MUST be uploaded with proper file naming (see [File Naming Convention](#file-naming-convention-for-chunked-uploads))
 - All chunks MUST use the same audio format
 
-### Request
+### Upload to Pre-signed URL (Cloud Storage)
+
+When `upload_url` points to cloud storage, upload each chunk as a separate object:
 
 ```http
-POST /sessions/ses_abc123def456/audio HTTP/1.1
-Host: api.scribe.example.com
-Authorization: X-API-Key sk_live_xxx
+PUT {upload_url}/audio_0.webm HTTP/1.1
 Content-Type: audio/webm;codecs=opus
-X-Chunk-Index: 0
 
-[binary audio data]
+[binary audio data for chunk 0]
 ```
-
-### Headers
-
-| Header | Required | Description |
-|--------|----------|-------------|
-| `Content-Type` | Yes | Audio MIME type (must match discovery) |
-| `X-Chunk-Index` | Yes | Zero-based chunk sequence number |
-| `Content-Length` | Yes | Size of audio data in bytes |
-
-### Response
 
 ```http
-HTTP/1.1 200 OK
-Content-Type: application/json
+PUT {upload_url}/audio_1.webm HTTP/1.1
+Content-Type: audio/webm;codecs=opus
 
-{
-  "session_id": "ses_abc123def456",
-  "chunk_index": 0,
-  "chunk_duration_ms": 15000,
-  "total_duration_ms": 15000,
-  "status": "received"
-}
+[binary audio data for chunk 1]
 ```
 
-### Response Fields
+### Upload to Scribe API Endpoint
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `session_id` | string | Session identifier |
-| `chunk_index` | integer | Received chunk index |
-| `chunk_duration_ms` | integer | Duration of this chunk |
-| `total_duration_ms` | integer | Total audio duration so far |
-| `status` | string | `"received"` on success |
+When `upload_url` points to the Scribe API, use multipart form data:
 
-### Multi-Chunk Example
+```http
+POST {upload_url} HTTP/1.1
+Content-Type: multipart/form-data; boundary=----FormBoundary
+
+------FormBoundary
+Content-Disposition: form-data; name="file"; filename="audio_0.webm"
+Content-Type: audio/webm;codecs=opus
+
+[binary audio data]
+------FormBoundary--
+```
+
+### Multi-Chunk Upload Flow
 
 ```
-Chunk 0: POST /sessions/{id}/audio  X-Chunk-Index: 0  [0-15 seconds]
-         → 200 OK, total_duration_ms: 15000
+Session Created → upload_url: https://storage.example.com/ses_abc123/
 
-Chunk 1: POST /sessions/{id}/audio  X-Chunk-Index: 1  [15-30 seconds]
-         → 200 OK, total_duration_ms: 30000
+Chunk 0: PUT {upload_url}/audio_0.webm  [0-15 seconds]
+         → 200 OK
 
-Chunk 2: POST /sessions/{id}/audio  X-Chunk-Index: 2  [30-42 seconds]
-         → 200 OK, total_duration_ms: 42000
+Chunk 1: PUT {upload_url}/audio_1.webm  [15-30 seconds]
+         → 200 OK
 
-End:     POST /sessions/{id}/end
-         → 200 OK, status: processing
+Chunk 2: PUT {upload_url}/audio_2.webm  [30-42 seconds]
+         → 200 OK
+
+End:     POST /sessions/ses_abc123/end
+         → 202 Accepted, status: processing
 ```
 
 ---
 
-## 7.4 Single File Upload
+## 7.5 Single File Upload
 
-For complete audio file upload after recording is finished.
+For complete audio file upload after recording is finished. Requires `upload_type: "single"` to be specified during session creation.
 
-### Request
+### Session Creation for Single Upload
 
 ```http
-POST /sessions/ses_abc123def456/audio HTTP/1.1
+POST /sessions HTTP/1.1
 Host: api.scribe.example.com
 Authorization: X-API-Key sk_live_xxx
-Content-Type: audio/wav
-X-Upload-Type: complete
+Content-Type: application/json
 
-[binary audio data]
+{
+  "templates": ["soap", "medications"],
+  "upload_type": "single"
+}
 ```
 
-### Headers
-
-| Header | Required | Description |
-|--------|----------|-------------|
-| `Content-Type` | Yes | Audio MIME type (must match discovery) |
-| `X-Upload-Type` | Yes | Must be `"complete"` for single upload |
-| `Content-Length` | Yes | Size of audio data in bytes |
-
-### Response
-
 ```http
-HTTP/1.1 200 OK
+HTTP/1.1 201 Created
 Content-Type: application/json
 
 {
   "session_id": "ses_abc123def456",
-  "duration_ms": 180000,
-  "status": "received"
+  "status": "created",
+  "upload_url": "https://storage.googleapis.com/scribe-uploads/ses_abc123def456/recording.webm?X-Goog-Signature=..."
 }
+```
+
+### Upload to Pre-signed URL (Cloud Storage)
+
+```http
+PUT {upload_url} HTTP/1.1
+Content-Type: audio/wav
+
+[binary audio data]
+```
+
+### Upload to Scribe API Endpoint
+
+```http
+POST {upload_url} HTTP/1.1
+Content-Type: multipart/form-data; boundary=----FormBoundary
+
+------FormBoundary
+Content-Disposition: form-data; name="file"; filename="consultation.wav"
+Content-Type: audio/wav
+
+[binary audio data]
+------FormBoundary--
+```
+
+### Single File Upload Flow
+
+```
+Session Created → upload_url: https://storage.example.com/ses_abc123/recording.webm?sig=...
+
+Upload:  PUT {upload_url}  [complete audio file]
+         → 200 OK
+
+End:     POST /sessions/ses_abc123/end
+         → 202 Accepted, status: processing
 ```
 
 ---
 
-## 7.5 Audio Format Requirements
+## 7.6 Audio Format Requirements
 
 ### Supported Formats
 
@@ -368,7 +422,7 @@ Content-Type: application/json
 
 ---
 
-## 7.6 Chunk Duration Limits
+## 7.7 Chunk Duration Limits
 
 ### Maximum Chunk Duration
 
@@ -404,7 +458,7 @@ Content-Type: application/json
 
 ---
 
-## 7.7 Upload Errors
+## 7.8 Upload Errors
 
 ### Session Not Found
 
@@ -464,7 +518,7 @@ HTTP/1.1 400 Bad Request
 
 ---
 
-## 7.8 Best Practices
+## 7.9 Best Practices
 
 ### For EMR Clients
 
