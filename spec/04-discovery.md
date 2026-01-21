@@ -56,6 +56,7 @@ Cache-Control: max-age=3600
   
   "endpoints": {
     "base_url": "https://api.scribe.example.com/v1",
+    "webhooks_url": "https://api.scribe.example.com/v1/webhooks"
   },
   
   "authentication": {
@@ -122,6 +123,7 @@ Cache-Control: max-age=3600
 | `protocol_version` | string | Current protocol version (e.g., `"0.1"`) |
 | `supported_versions` | array | All supported protocol versions |
 | `endpoints.base_url` | string | Base URL for API endpoints |
+| `endpoints.webhooks_url` | string | Webhook registration endpoint (if webhook delivery supported) |
 | `authentication.supported_methods` | array | Supported auth methods: `["api_key"]`, `["oidc"]`, or both |
 | `capabilities.audio_formats` | array | Supported audio MIME types |
 | `capabilities.max_chunk_duration_seconds` | integer | Maximum audio chunk duration (≤20 recommended) |

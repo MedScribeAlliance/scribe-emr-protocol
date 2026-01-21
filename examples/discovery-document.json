@@ -12,6 +12,7 @@
 
   "endpoints": {
     "base_url": "https://api.medscribepro.example.com/v1",
+    "webhooks_url": "https://api.medscribepro.example.com/v1/webhooks",
     "authorization_endpoint": "https://auth.medscribepro.example.com/oauth/authorize",
     "token_endpoint": "https://auth.medscribepro.example.com/oauth/token"
   },

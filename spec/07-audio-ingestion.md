@@ -402,23 +402,11 @@ Formats are declared in the discovery document:
 
 ### Format Validation
 
-If an unsupported format is uploaded:
+Clients SHOULD validate audio format before uploading by checking supported formats in the discovery document.
 
-```http
-HTTP/1.1 400 Bad Request
-Content-Type: application/json
+**Note:** When uploading to pre-signed URLs (S3, GCS, Azure), format validation errors are returned directly by the cloud storage provider in their native format. The Scribe Service cannot control these error responses. Clients should handle standard HTTP 4xx errors from the storage provider.
 
-{
-  "error": {
-    "code": "invalid_audio_format",
-    "message": "Audio format 'audio/mp3' is not supported",
-    "details": {
-      "provided_format": "audio/mp3",
-      "supported_formats": ["audio/webm;codecs=opus", "audio/wav"]
-    }
-  }
-}
-```
+Format validation by the Scribe Service occurs during processing. Invalid formats will result in a `failed` session status with an appropriate error message.
 
 ---
 
@@ -438,83 +426,40 @@ The discovery document specifies maximum chunk duration:
 
 Protocol RECOMMENDS maximum of 20 seconds per chunk.
 
-### Chunk Too Large Error
+### Chunk Duration Validation
 
-```http
-HTTP/1.1 400 Bad Request
-Content-Type: application/json
+Chunk duration is validated by the Scribe Service during processing, not during upload. If any chunk exceeds the maximum duration:
 
-{
-  "error": {
-    "code": "chunk_too_large",
-    "message": "Audio chunk exceeds maximum duration",
-    "details": {
-      "chunk_duration_seconds": 25,
-      "max_duration_seconds": 20
-    }
-  }
-}
-```
+- The session status will reflect the error
+- Processing may result in `partial` or `failed` status
+- The error details are available via `GET /sessions/{id}` or webhook notification
+
+Clients SHOULD validate chunk duration before uploading by checking `max_chunk_duration_seconds` in the discovery document.
 
 ---
 
 ## 7.8 Upload Errors
 
-### Session Not Found
+Since audio uploads typically go to cloud storage providers (S3, GCS, Azure) or standard file upload servers, error responses follow the provider's native format. The Scribe Service cannot control these responses.
 
-```http
-HTTP/1.1 404 Not Found
+### Common HTTP Errors
 
-{
-  "error": {
-    "code": "session_not_found",
-    "message": "Session 'ses_invalid' does not exist"
-  }
-}
-```
+| Status Code | Description | Common Causes |
+|-------------|-------------|---------------|
+| `400 Bad Request` | Invalid request | Malformed request, invalid headers |
+| `401 Unauthorized` | Authentication failed | Expired or invalid pre-signed URL |
+| `403 Forbidden` | Access denied | Insufficient permissions, URL signature mismatch |
+| `404 Not Found` | Resource not found | Invalid upload path, session doesn't exist |
+| `413 Payload Too Large` | File too large | Exceeds storage provider limits |
 
-### Session Already Ended
+### Client Handling
 
-```http
-HTTP/1.1 400 Bad Request
+Clients SHOULD:
 
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "Cannot upload audio to ended session"
-  }
-}
-```
-
-### Session Expired
-
-```http
-HTTP/1.1 410 Gone
-
-{
-  "error": {
-    "code": "session_expired",
-    "message": "Session has expired"
-  }
-}
-```
-
-### Chunk Out of Order
-
-```http
-HTTP/1.1 400 Bad Request
-
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "Chunk index 5 received, expected 3",
-    "details": {
-      "received_index": 5,
-      "expected_index": 3
-    }
-  }
-}
-```
+1. **Retry on transient errors** (5xx status codes) with exponential backoff
+2. **Check session status** via `GET /sessions/{id}` if upload fails to determine next steps
+3. **Request new session** if pre-signed URL has expired (401/403 errors)
+4. **Log error responses** for debugging, as formats vary by provider
 
 ---
 

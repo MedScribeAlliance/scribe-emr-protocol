@@ -144,6 +144,17 @@ All requested templates are extracted from the same audio/transcript.
 
 ## 8.5 Template Output Formats
 
+**Important:** The template output formats shown below are **examples only**. The actual structure, fields, and content of each template are determined by the Scribe Service provider based on their capabilities and implementation. EMR clients SHOULD:
+
+1. **Consult the Scribe provider's documentation** for exact output schemas
+2. **Use the `GET /templates` endpoint** to discover available templates and their descriptions
+3. **Handle variations gracefully** as different providers may return different structures for the same template ID
+4. **Not assume fixed field names** unless explicitly guaranteed by the provider
+
+The examples below represent common patterns but are not normative.
+
+---
+
 ### SOAP Template (`soap`)
 
 ```json

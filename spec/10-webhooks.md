@@ -6,25 +6,59 @@
 
 ## 10.1 Overview
 
-Webhooks enable proactive delivery of session events and extraction results to EMR clients. This eliminates the need for polling and reduces latency.
+Webhooks provide real-time event notifications to EMR clients when session state changes occur. This protocol uses an **event notification model** where webhooks contain only event metadata, and full session data is retrieved via the authenticated `GET /sessions/{id}` API.
 
 ```
 ┌─────────────────┐                    ┌─────────────────┐
-│                 │                    │                 │
-│  Scribe Service │───── Webhook ─────▶│   EMR Backend   │
-│                 │                    │                 │
-└─────────────────┘                    └─────────────────┘
+│                 │   Event Notification│                 │
+│  Scribe Service │──────────────────▶│   EMR Backend   │
+│                 │   (session_id only) │                 │
+└─────────────────┘                    └────────┬────────┘
+                                                │
+       ┌────────────────────────────────────────┘
+       │  GET /sessions/{id}
+       │  (with authentication)
+       ▼
+┌─────────────────┐
+│  Full Session   │
+│  Data Response  │
+└─────────────────┘
 ```
+
+### Benefits of Event Notification Model
+
+| Benefit | Description |
+|---------|-------------|
+| **Lightweight payloads** | Only event type and session_id transmitted |
+| **Security simplified** | No sensitive data in webhook; signature verification optional |
+| **Consistent data access** | All data retrieval through authenticated API |
+| **Reduced complexity** | EMR handles one data format from status API |
+| **Standard pattern** | Common approach used by Stripe, GitHub, and other APIs |
 
 ---
 
 ## 10.2 Webhook Registration
 
-**Endpoint:** `POST /webhooks`
+**Endpoint:** Discovered via `endpoints.webhooks_url` in the [discovery document](./04-discovery.md)
 
 **Required:** RECOMMENDED
 
-Registers a webhook endpoint to receive session events.
+Registers a webhook endpoint to receive session event notifications.
+
+### Discovering the Webhook Endpoint
+
+The webhook registration URL is provided in the well-known discovery document:
+
+```json
+{
+  "endpoints": {
+    "base_url": "https://api.scribe.example.com/v1",
+    "webhooks_url": "https://api.scribe.example.com/v1/webhooks"
+  }
+}
+```
+
+EMR clients MUST use the `webhooks_url` from the discovery document rather than constructing the URL manually.
 
 ### Request
 
@@ -54,7 +88,7 @@ Content-Type: application/json
 |-------|------|----------|-------------|
 | `url` | string | Yes | HTTPS webhook endpoint URL |
 | `events` | array | Yes | Events to subscribe to |
-| `secret` | string | Yes | Secret for signature verification (provided by EMR) |
+| `secret` | string | No | Secret for optional signature verification |
 
 ### Response
 
@@ -138,194 +172,150 @@ HTTP/1.1 204 No Content
 
 ## 10.5 Webhook Payload Structure
 
-All webhook payloads follow this structure:
+All webhook payloads are lightweight event notifications containing only the event type and session identifier. No sensitive data (transcripts, templates, patient information) is included.
 
-```json
-{
-  "event": "event.type",
-  "timestamp": "2025-01-19T10:35:00Z",
-  "data": {
-    // Event-specific data
-  }
-}
-```
-
-### session.started
-
-```json
-{
-  "event": "session.started",
-  "timestamp": "2025-01-19T10:30:00Z",
-  "data": {
-    "session_id": "ses_abc123def456",
-    "status": "created",
-    "created_at": "2025-01-19T10:30:00Z",
-    "expires_at": "2025-01-19T11:30:00Z",
-    "additional_data": {
-      "emr_encounter_id": "enc_123"
-    }
-  }
-}
-```
-
-### session.ended
-
-```json
-{
-  "event": "session.ended",
-  "timestamp": "2025-01-19T10:32:00Z",
-  "data": {
-    "session_id": "ses_abc123def456",
-    "status": "processing",
-    "audio_files_received": 3,
-    "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
-    "additional_data": {
-      "emr_encounter_id": "enc_123"
-    }
-  }
-}
-```
-
-### session.completed
+### Payload Format
 
 ```json
 {
   "event": "session.completed",
   "timestamp": "2025-01-19T10:35:00Z",
-  "data": {
-    "session_id": "ses_abc123def456",
-    "status": "completed",
-    "created_at": "2025-01-19T10:30:00Z",
-    "completed_at": "2025-01-19T10:35:00Z",
-    "model_used": "pro",
-    "language_detected": "hi",
-    "audio_files_received": 3,
-    "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
-    "additional_data": {
-      "emr_encounter_id": "enc_123",
-      "emr_patient_id": "pat_456"
-    },
-    "templates": {
-      "soap": {
-        "status": "success",
-        "data": {
-          "subjective": "...",
-          "objective": "...",
-          "assessment": "...",
-          "plan": "..."
-        }
-      },
-      "medications": {
-        "status": "success",
-        "data": [...]
-      }
-    },
-    "transcript": "Doctor: ...\nPatient: ..."
-  }
+  "session_id": "ses_abc123def456"
 }
 ```
 
-### session.partial
+### Payload Fields
 
-Sent when processing completes with partial results.
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | string | Event type (e.g., `session.completed`) |
+| `timestamp` | string | ISO 8601 timestamp of the event |
+| `session_id` | string | Session identifier for data retrieval |
 
+### Event Payloads
+
+All events use the same simple structure:
+
+**session.started**
+```json
+{
+  "event": "session.started",
+  "timestamp": "2025-01-19T10:30:00Z",
+  "session_id": "ses_abc123def456"
+}
+```
+
+**session.ended**
+```json
+{
+  "event": "session.ended",
+  "timestamp": "2025-01-19T10:32:00Z",
+  "session_id": "ses_abc123def456"
+}
+```
+
+**session.completed**
+```json
+{
+  "event": "session.completed",
+  "timestamp": "2025-01-19T10:35:00Z",
+  "session_id": "ses_abc123def456"
+}
+```
+
+**session.partial**
 ```json
 {
   "event": "session.partial",
   "timestamp": "2025-01-19T10:35:00Z",
-  "data": {
-    "session_id": "ses_abc123def456",
-    "status": "partial",
-    "created_at": "2025-01-19T10:30:00Z",
-    "completed_at": "2025-01-19T10:35:00Z",
-    "model_used": "pro",
-    "language_detected": "hi",
-    "audio_files_received": 3,
-    "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
-    "audio_files_processed": 2,
-    "additional_data": {
-      "emr_encounter_id": "enc_123",
-      "emr_patient_id": "pat_456"
-    },
-    "templates": {
-      "soap": {
-        "status": "success",
-        "data": {
-          "subjective": "...",
-          "objective": "...",
-          "assessment": "...",
-          "plan": "..."
-        }
-      },
-      "medications": {
-        "status": "failed",
-        "error": {
-          "code": "extraction_failed",
-          "message": "Could not extract medication information from audio"
-        }
-      }
-    },
-    "transcript": "Doctor: ...\nPatient: ...",
-    "processing_errors": [
-      {
-        "type": "audio_file_skipped",
-        "message": "Audio file audio_2.webm skipped due to poor quality",
-        "file": "audio_2.webm"
-      }
-    ]
-  }
+  "session_id": "ses_abc123def456"
 }
 ```
 
-### session.failed
-
+**session.failed**
 ```json
 {
   "event": "session.failed",
   "timestamp": "2025-01-19T10:35:00Z",
-  "data": {
-    "session_id": "ses_abc123def456",
-    "status": "failed",
-    "created_at": "2025-01-19T10:30:00Z",
-    "audio_files_received": 3,
-    "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
-    "error": {
-      "code": "processing_failed",
-      "message": "Unable to process audio due to poor quality"
-    },
-    "additional_data": {
-      "emr_encounter_id": "enc_123"
-    }
-  }
+  "session_id": "ses_abc123def456"
 }
 ```
 
-### session.expired
-
+**session.expired**
 ```json
 {
   "event": "session.expired",
   "timestamp": "2025-01-19T11:30:00Z",
-  "data": {
-    "session_id": "ses_abc123def456",
-    "status": "expired",
-    "created_at": "2025-01-19T10:30:00Z",
-    "expired_at": "2025-01-19T11:30:00Z",
-    "message": "Session expired due to inactivity",
-    "additional_data": {
-      "emr_encounter_id": "enc_123"
-    }
-  }
+  "session_id": "ses_abc123def456"
 }
 ```
 
 ---
 
-## 10.6 Signature Verification
+## 10.6 Retrieving Session Data
 
-Scribe Services MUST sign webhook payloads. EMR Clients MUST verify signatures before processing.
+After receiving a webhook notification, EMR clients retrieve full session data via the authenticated status API.
+
+### Flow
+
+```
+1. Receive webhook → { event: "session.completed", session_id: "ses_abc123" }
+2. Extract session_id
+3. Call GET /sessions/ses_abc123 with authentication
+4. Process full session data (templates, transcript, etc.)
+```
+
+### Example
+
+```http
+GET /sessions/ses_abc123def456 HTTP/1.1
+Host: api.scribe.example.com
+Authorization: X-API-Key sk_live_xxx
+```
+
+```json
+{
+  "session_id": "ses_abc123def456",
+  "status": "completed",
+  "created_at": "2025-01-19T10:30:00Z",
+  "completed_at": "2025-01-19T10:35:00Z",
+  "model_used": "pro",
+  "language_detected": "en",
+  "audio_files_received": 3,
+  "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
+  "additional_data": {
+    "emr_encounter_id": "enc_123"
+  },
+  "templates": {
+    "soap": {
+      "status": "success",
+      "data": { ... }
+    }
+  },
+  "transcript": "Doctor: Good morning..."
+}
+```
+
+See [Sessions](./06-sessions.md) and [Extraction](./09-extraction.md) for full response structure.
+
+---
+
+## 10.7 Signature Verification (Optional)
+
+Since webhooks contain no sensitive data, signature verification is **optional but recommended** for verifying webhook authenticity.
+
+### When to Use Signature Verification
+
+| Scenario | Recommendation |
+|----------|----------------|
+| High-security environments | Recommended |
+| Public-facing webhook endpoints | Recommended |
+| Internal/VPN-protected endpoints | Optional |
+| Development/testing | Optional |
 
 ### Signature Header
+
+If a secret was provided during registration, webhooks include a signature:
 
 ```http
 POST /scribe-webhook HTTP/1.1
@@ -333,7 +323,7 @@ Host: emr.example.com
 Content-Type: application/json
 X-MSA-Signature: t=1705661400,v1=5257a869e7ecebeda32affa62cdca3fa51cded5fa20f8de7...
 
-{...payload...}
+{"event":"session.completed","timestamp":"2025-01-19T10:35:00Z","session_id":"ses_abc123def456"}
 ```
 
 ### Signature Format
@@ -349,186 +339,63 @@ X-MSA-Signature: t={timestamp},v1={signature}
 
 ### Signature Computation
 
-The signature is computed as:
-
 ```
 signed_payload = "{timestamp}.{raw_request_body}"
 signature = HMAC-SHA256(secret, signed_payload)
 ```
 
-### Verification Steps
-
-1. Extract `t` (timestamp) and `v1` (signature) from header
-2. Verify timestamp is within acceptable window (recommended: 5 minutes)
-3. Construct signed payload: `{timestamp}.{raw_body}`
-4. Compute HMAC-SHA256 using webhook secret
-5. Compare computed signature with `v1` using constant-time comparison
-6. Reject request if signature doesn't match
-
-### Python Example
+### Verification Example (Python)
 
 ```python
 import hmac
 import hashlib
-import time
 
-def verify_webhook_signature(
-    payload: bytes,
-    signature_header: str,
-    secret: str,
-    tolerance_seconds: int = 300
-) -> bool:
-    """
-    Verify webhook signature.
-    
-    Args:
-        payload: Raw request body bytes
-        signature_header: X-MSA-Signature header value
-        secret: Webhook secret
-        tolerance_seconds: Maximum age of signature (default 5 minutes)
-    
-    Returns:
-        True if signature is valid
-    """
-    # Parse header
-    parts = {}
-    for item in signature_header.split(','):
-        key, value = item.split('=', 1)
-        parts[key] = value
-    
+def verify_webhook_signature(payload: bytes, signature_header: str, secret: str) -> bool:
+    parts = dict(item.split('=', 1) for item in signature_header.split(','))
     timestamp = parts.get('t')
     signature = parts.get('v1')
-    
+
     if not timestamp or not signature:
         return False
-    
-    # Check timestamp freshness
-    try:
-        ts = int(timestamp)
-        if abs(time.time() - ts) > tolerance_seconds:
-            return False
-    except ValueError:
-        return False
-    
-    # Compute expected signature
+
     signed_payload = f"{timestamp}.{payload.decode('utf-8')}"
     expected = hmac.new(
         secret.encode('utf-8'),
         signed_payload.encode('utf-8'),
         hashlib.sha256
     ).hexdigest()
-    
-    # Constant-time comparison
+
     return hmac.compare_digest(expected, signature)
-```
-
-### Node.js Example
-
-```javascript
-const crypto = require('crypto');
-
-function verifyWebhookSignature(payload, signatureHeader, secret) {
-  const parts = Object.fromEntries(
-    signatureHeader.split(',').map(p => p.split('='))
-  );
-  
-  const timestamp = parts.t;
-  const signature = parts.v1;
-  
-  // Check timestamp (5 minute tolerance)
-  const age = Math.abs(Date.now() / 1000 - parseInt(timestamp));
-  if (age > 300) {
-    return false;
-  }
-  
-  // Compute expected signature
-  const signedPayload = `${timestamp}.${payload}`;
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(signedPayload)
-    .digest('hex');
-  
-  // Constant-time comparison
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected)
-  );
-}
 ```
 
 ---
 
-## 10.7 Client-Side Delivery
+## 10.8 Client-Side Delivery
 
-For client-side SDK integrations, Scribe Services MAY deliver results via browser messaging mechanisms.
+For client-side SDK integrations, Scribe Services MAY deliver event notifications via browser messaging mechanisms.
 
 ### PostMessage
 
-Scribe SDK sends results to parent EMR application:
-
 ```javascript
-// Scribe SDK (in iframe) sends:
+// Scribe SDK (in iframe) sends event notification:
 window.parent.postMessage({
   type: 'medscribealliance:session.completed',
-  data: {
-    session_id: 'ses_abc123def456',
-    status: 'completed',
-    templates: { ... },
-    transcript: '...'
-  }
+  session_id: 'ses_abc123def456'
 }, 'https://emr.example.com');
 ```
 
-EMR application listens:
-
 ```javascript
-// EMR application receives:
-window.addEventListener('message', (event) => {
-  // Verify origin
+// EMR application receives and fetches data:
+window.addEventListener('message', async (event) => {
   if (event.origin !== 'https://scribe.example.com') {
     return;
   }
-  
-  // Handle events
+
   if (event.data.type === 'medscribealliance:session.completed') {
-    const { session_id, templates, transcript } = event.data.data;
-    fillEMRForm(templates);
-  }
-  
-  if (event.data.type === 'medscribealliance:session.failed') {
-    const { error } = event.data.data;
-    showError(error.message);
-  }
-});
-```
-
-### Callback Function
-
-EMR provides callbacks during SDK initialization:
-
-```javascript
-// EMR initializes Scribe SDK with callbacks
-ScribeSDK.init({
-  apiKey: 'sk_live_xxx',  // or use OIDC token
-  
-  onSessionStarted: (data) => {
-    console.log('Session started:', data.session_id);
-  },
-  
-  onSessionCompleted: (data) => {
-    const { session_id, templates, transcript } = data;
-    fillEMRForm(templates.soap);
-    fillMedicationsList(templates.medications);
-  },
-  
-  onSessionFailed: (error) => {
-    console.error('Session failed:', error.code, error.message);
-    showErrorToUser(error.message);
-  },
-  
-  onSessionExpired: (data) => {
-    console.warn('Session expired:', data.session_id);
-    promptUserToRestart();
+    // Fetch full data via API
+    const response = await fetch(`/api/sessions/${event.data.session_id}`);
+    const sessionData = await response.json();
+    fillEMRForm(sessionData.templates);
   }
 });
 ```
@@ -539,30 +406,30 @@ ScribeSDK.init({
 |------------|-------------|
 | `medscribealliance:session.started` | Session created |
 | `medscribealliance:session.ended` | Session ended, processing |
-| `medscribealliance:session.completed` | All results ready |
+| `medscribealliance:session.completed` | Processing complete |
 | `medscribealliance:session.partial` | Partial results ready |
 | `medscribealliance:session.failed` | Processing failed |
 | `medscribealliance:session.expired` | Session timed out |
 
 ---
 
-## 10.8 Best Practices
+## 10.9 Best Practices
 
 ### For EMR Clients
 
-1. **Always verify signatures** before processing webhooks
-2. **Respond quickly** (< 30 seconds) to webhook requests
-3. **Return 2xx status** on successful receipt
-4. **Process asynchronously** - acknowledge receipt, then process
-5. **Handle duplicates** - webhooks may be retried
+1. **Respond quickly** (< 30 seconds) to webhook requests
+2. **Return 2xx status** immediately on receipt
+3. **Fetch data asynchronously** after acknowledging webhook
+4. **Handle duplicates** - webhooks may be retried; use session_id for deduplication
+5. **Implement retry logic** for status API calls
 6. **Log webhook events** for debugging
 
 ### For Scribe Services
 
-1. **Sign all webhooks** using the registered secret
-2. **Include timestamp** in signature for replay protection
-3. **Retry on failure** (implementation-specific)
-4. **Log delivery attempts** for debugging
+1. **Keep payloads minimal** - only event type and session_id
+2. **Retry on failure** with exponential backoff
+3. **Log delivery attempts** for debugging
+4. **Include signature** if secret was provided during registration
 5. **Support multiple webhooks** per client if needed
 
 ---
