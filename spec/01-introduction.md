@@ -15,7 +15,7 @@ The MedScribeAlliance Protocol defines a standard interface for interoperability
 This specification covers:
 
 - Discovery of scribe service capabilities
-- Authentication mechanisms for both B2B and B2C integrations
+- Authentication mechanisms for backend to backend ( B2B ) and user intiated integration ( B2C )
 - Voice data upload (single and chunked)
 - Template-based structured data extraction
 - Asynchronous result delivery via webhooks
@@ -63,11 +63,11 @@ A conformant **Scribe Service** implementation:
 
 ### EMR Client Conformance
 
-A conformant **EMR Client** implementation:
+A conformant **EMR Client/SDK** implementation:
 
 - MUST discover scribe capabilities before initiating sessions
 - MUST use supported audio formats as declared in discovery
-- MUST explicitly end sessions using the end session endpoint
+- MUST explicitly start and end sessions using the session endpoint
 - MUST verify webhook signatures before processing
 - SHOULD implement webhook receivers for asynchronous results
 - SHOULD handle template unavailability gracefully
@@ -78,7 +78,7 @@ A conformant **EMR Client** implementation:
 
 HTTP request and response examples use the following format:
 
-```http
+```https
 POST /sessions HTTP/1.1
 Host: api.scribe.example.com
 Authorization: X-API-Key sk_live_xxx
