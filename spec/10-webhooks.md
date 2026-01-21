@@ -40,6 +40,7 @@ Content-Type: application/json
     "session.started",
     "session.ended",
     "session.completed",
+    "session.partial",
     "session.failed",
     "session.expired"
   ],
@@ -66,8 +67,9 @@ Content-Type: application/json
   "url": "https://emr.example.com/scribe-webhook",
   "events": [
     "session.started",
-    "session.ended", 
+    "session.ended",
     "session.completed",
+    "session.partial",
     "session.failed",
     "session.expired"
   ],
@@ -127,8 +129,9 @@ HTTP/1.1 204 No Content
 |-------|-------------|----------------|
 | `session.started` | Session created and ready | After `POST /sessions` |
 | `session.ended` | Session ended, processing starting | After `POST /sessions/{id}/end` |
-| `session.completed` | Extraction complete | After successful processing |
-| `session.failed` | Processing failed | After processing failure |
+| `session.completed` | Extraction complete, all results available | After successful processing |
+| `session.partial` | Extraction complete, partial results available | After processing with some failures |
+| `session.failed` | Processing failed entirely | After processing failure |
 | `session.expired` | Session timed out | After session timeout |
 
 ---
@@ -158,7 +161,7 @@ All webhook payloads follow this structure:
     "status": "created",
     "created_at": "2025-01-19T10:30:00Z",
     "expires_at": "2025-01-19T11:30:00Z",
-    "metadata": {
+    "additional_data": {
       "emr_encounter_id": "enc_123"
     }
   }
@@ -174,8 +177,9 @@ All webhook payloads follow this structure:
   "data": {
     "session_id": "ses_abc123def456",
     "status": "processing",
-    "audio_duration_ms": 180000,
-    "metadata": {
+    "audio_files_received": 3,
+    "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
+    "additional_data": {
       "emr_encounter_id": "enc_123"
     }
   }
@@ -195,22 +199,80 @@ All webhook payloads follow this structure:
     "completed_at": "2025-01-19T10:35:00Z",
     "model_used": "pro",
     "language_detected": "hi",
-    "audio_duration_ms": 180000,
-    "metadata": {
+    "audio_files_received": 3,
+    "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
+    "additional_data": {
       "emr_encounter_id": "enc_123",
       "emr_patient_id": "pat_456"
     },
     "templates": {
       "soap": {
-        "subjective": "...",
-        "objective": "...",
-        "assessment": "...",
-        "plan": "..."
+        "status": "success",
+        "data": {
+          "subjective": "...",
+          "objective": "...",
+          "assessment": "...",
+          "plan": "..."
+        }
       },
-      "medications": [...]
+      "medications": {
+        "status": "success",
+        "data": [...]
+      }
+    },
+    "transcript": "Doctor: ...\nPatient: ..."
+  }
+}
+```
+
+### session.partial
+
+Sent when processing completes with partial results.
+
+```json
+{
+  "event": "session.partial",
+  "timestamp": "2025-01-19T10:35:00Z",
+  "data": {
+    "session_id": "ses_abc123def456",
+    "status": "partial",
+    "created_at": "2025-01-19T10:30:00Z",
+    "completed_at": "2025-01-19T10:35:00Z",
+    "model_used": "pro",
+    "language_detected": "hi",
+    "audio_files_received": 3,
+    "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
+    "audio_files_processed": 2,
+    "additional_data": {
+      "emr_encounter_id": "enc_123",
+      "emr_patient_id": "pat_456"
+    },
+    "templates": {
+      "soap": {
+        "status": "success",
+        "data": {
+          "subjective": "...",
+          "objective": "...",
+          "assessment": "...",
+          "plan": "..."
+        }
+      },
+      "medications": {
+        "status": "failed",
+        "error": {
+          "code": "extraction_failed",
+          "message": "Could not extract medication information from audio"
+        }
+      }
     },
     "transcript": "Doctor: ...\nPatient: ...",
-    "template_errors": []
+    "processing_errors": [
+      {
+        "type": "audio_file_skipped",
+        "message": "Audio file audio_2.webm skipped due to poor quality",
+        "file": "audio_2.webm"
+      }
+    ]
   }
 }
 ```
@@ -225,12 +287,13 @@ All webhook payloads follow this structure:
     "session_id": "ses_abc123def456",
     "status": "failed",
     "created_at": "2025-01-19T10:30:00Z",
-    "audio_duration_ms": 180000,
+    "audio_files_received": 3,
+    "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
     "error": {
       "code": "processing_failed",
       "message": "Unable to process audio due to poor quality"
     },
-    "metadata": {
+    "additional_data": {
       "emr_encounter_id": "enc_123"
     }
   }
@@ -249,7 +312,7 @@ All webhook payloads follow this structure:
     "created_at": "2025-01-19T10:30:00Z",
     "expired_at": "2025-01-19T11:30:00Z",
     "message": "Session expired due to inactivity",
-    "metadata": {
+    "additional_data": {
       "emr_encounter_id": "enc_123"
     }
   }
@@ -476,7 +539,8 @@ ScribeSDK.init({
 |------------|-------------|
 | `medscribealliance:session.started` | Session created |
 | `medscribealliance:session.ended` | Session ended, processing |
-| `medscribealliance:session.completed` | Results ready |
+| `medscribealliance:session.completed` | All results ready |
+| `medscribealliance:session.partial` | Partial results ready |
 | `medscribealliance:session.failed` | Processing failed |
 | `medscribealliance:session.expired` | Session timed out |
 

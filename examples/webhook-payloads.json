@@ -11,7 +11,7 @@
           "status": "created",
           "created_at": "2025-01-19T10:30:00Z",
           "expires_at": "2025-01-19T11:30:00Z",
-          "metadata": {
+          "additional_data": {
             "emr_encounter_id": "enc_123",
             "emr_patient_id": "pat_456",
             "department": "cardiology"
@@ -28,8 +28,9 @@
         "data": {
           "session_id": "ses_abc123def456",
           "status": "processing",
-          "audio_duration_ms": 180000,
-          "metadata": {
+          "audio_files_received": 3,
+          "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
+          "additional_data": {
             "emr_encounter_id": "enc_123",
             "emr_patient_id": "pat_456",
             "department": "cardiology"
@@ -50,8 +51,9 @@
           "completed_at": "2025-01-19T10:35:00Z",
           "model_used": "pro",
           "language_detected": "en",
-          "audio_duration_ms": 180000,
-          "metadata": {
+          "audio_files_received": 3,
+          "audio_files": ["audio_0.webm", "audio_1.webm", "audio_2.webm"],
+          "additional_data": {
             "emr_encounter_id": "enc_123",
             "emr_patient_id": "pat_456",
             "department": "cardiology"
@@ -105,12 +107,13 @@
           "session_id": "ses_xyz789abc",
           "status": "failed",
           "created_at": "2025-01-19T10:30:00Z",
-          "audio_duration_ms": 45000,
+          "audio_files_received": 2,
+          "audio_files": ["audio_0.webm", "audio_1.webm"],
           "error": {
             "code": "audio_quality_poor",
             "message": "Audio quality is too low for accurate transcription"
           },
-          "metadata": {
+          "additional_data": {
             "emr_encounter_id": "enc_789"
           }
         }
@@ -128,7 +131,7 @@
           "created_at": "2025-01-19T10:30:00Z",
           "expired_at": "2025-01-19T11:30:00Z",
           "message": "Session expired due to inactivity",
-          "metadata": {
+          "additional_data": {
             "emr_encounter_id": "enc_456"
           }
         }

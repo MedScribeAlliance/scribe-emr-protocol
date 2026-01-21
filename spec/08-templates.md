@@ -109,7 +109,7 @@ The following template IDs are RECOMMENDED for standardization across implementa
 Scribe Services MUST generate a complete transcript for every session internally, regardless of which templates are requested. The transcript is:
 
 - Always generated during processing
-- Returned to EMR only if `include_transcript: true` in session creation
+- Always returned to EMR in the session response
 - The foundation for all template extractions
 
 ---
@@ -124,8 +124,7 @@ Authorization: X-API-Key sk_live_xxx
 Content-Type: application/json
 
 {
-  "templates": ["soap", "medications"],
-  "include_transcript": true
+  "templates": ["soap", "medications"]
 }
 ```
 
@@ -268,7 +267,7 @@ If a requested template is not available, the Scribe Service MUST:
 1. **Check available templates** via `GET /templates` before session creation
 2. **Request only needed templates** to optimize processing
 3. **Handle partial results** when some templates fail
-4. **Always request transcript** if raw text is needed for custom processing
+4. **Use the transcript** (always included) for custom processing needs
 
 ### For Scribe Services
 

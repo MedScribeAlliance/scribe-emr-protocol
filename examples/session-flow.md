@@ -68,8 +68,7 @@ curl -X POST https://api.scribe.example.com/v1/sessions \
     "templates": ["soap", "medications"],
     "model": "pro",
     "language_hint": "en",
-    "include_transcript": true,
-    "metadata": {
+    "additional_data": {
       "emr_encounter_id": "enc_12345",
       "emr_patient_id": "pat_67890"
     }
@@ -148,7 +147,8 @@ curl -X POST https://api.scribe.example.com/v1/sessions/ses_abc123def456/end \
 {
   "session_id": "ses_abc123def456",
   "status": "processing",
-  "audio_duration_ms": 180000
+  "audio_files_received": 3,
+  "audio_files": ["chunk_0.webm", "chunk_1.webm", "chunk_2.webm"]
 }
 ```
 
@@ -186,7 +186,7 @@ X-MSA-Signature: t=1705661700,v1=a2b3c4d5e6f7...
       ]
     },
     "transcript": "Doctor: Good morning...",
-    "metadata": {
+    "additional_data": {
       "emr_encounter_id": "enc_12345",
       "emr_patient_id": "pat_67890"
     }
