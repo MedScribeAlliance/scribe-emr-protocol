@@ -1,0 +1,84 @@
+{
+  "protocol": "medscribealliance",
+  "protocol_version": "0.1",
+  "supported_versions": ["0.1"],
+
+  "service": {
+    "name": "MedScribe Pro",
+    "documentation_url": "https://docs.medscribepro.example.com",
+    "support_email": "support@medscribepro.example.com",
+    "security_contact": "security@medscribepro.example.com"
+  },
+
+  "endpoints": {
+    "base_url": "https://api.medscribepro.example.com/v1",
+    "webhooks_url": "https://api.medscribepro.example.com/v1/webhooks",
+    "authorization_endpoint": "https://auth.medscribepro.example.com/oauth/authorize",
+    "token_endpoint": "https://auth.medscribepro.example.com/oauth/token"
+  },
+
+  "authentication": {
+    "supported_methods": ["api_key", "oidc"],
+    "oidc": {
+      "issuer": "https://auth.medscribepro.example.com",
+      "scopes_supported": ["openid", "profile"]
+    }
+  },
+
+  "capabilities": {
+    "audio_formats": [
+      "audio/webm;codecs=opus",
+      "audio/wav",
+      "audio/ogg",
+      "audio/ogg;codecs=opus"
+    ],
+    "max_chunk_duration_seconds": 20,
+    "upload_methods": ["chunked", "single"],
+    "webhook_delivery": true,
+    "client_sdk_delivery": true
+  },
+
+  "models": [
+    {
+      "id": "lite",
+      "display_name": "Lite",
+      "languages": ["en", "hi"],
+      "max_session_duration_seconds": 600,
+      "response_speed": "fast",
+      "features": {
+        "realtime_transcription": false,
+        "speaker_diarization": false,
+        "custom_templates": false
+      }
+    },
+    {
+      "id": "standard",
+      "display_name": "Standard",
+      "languages": ["en", "hi", "ta", "te", "bn"],
+      "max_session_duration_seconds": 1800,
+      "response_speed": "standard",
+      "features": {
+        "realtime_transcription": true,
+        "speaker_diarization": false,
+        "custom_templates": false
+      }
+    },
+    {
+      "id": "pro",
+      "display_name": "Professional",
+      "languages": ["en", "hi", "ta", "te", "bn", "mr", "gu", "kn", "ml", "pa"],
+      "max_session_duration_seconds": 3600,
+      "response_speed": "standard",
+      "features": {
+        "realtime_transcription": true,
+        "speaker_diarization": true,
+        "custom_templates": true
+      }
+    }
+  ],
+
+  "languages": {
+    "supported": ["en", "hi", "ta", "te", "bn", "mr", "gu", "kn", "ml", "pa"],
+    "auto_detection": true
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "description": "Example webhook payloads for MedScribeAlliance Protocol",
+  "note": "Webhooks contain only event notifications. Full session data is retrieved via GET /sessions/{id}",
+  "examples": [
+    {
+      "event": "session.started",
+      "description": "Sent when a new session is created",
+      "payload": {
+        "event": "session.started",
+        "timestamp": "2025-01-19T10:30:00Z",
+        "session_id": "ses_abc123def456"
+      }
+    },
+    {
+      "event": "session.ended",
+      "description": "Sent when session is explicitly ended and processing begins",
+      "payload": {
+        "event": "session.ended",
+        "timestamp": "2025-01-19T10:32:00Z",
+        "session_id": "ses_abc123def456"
+      }
+    },
+    {
+      "event": "session.completed",
+      "description": "Sent when extraction is complete with full results",
+      "payload": {
+        "event": "session.completed",
+        "timestamp": "2025-01-19T10:35:00Z",
+        "session_id": "ses_abc123def456"
+      }
+    },
+    {
+      "event": "session.partial",
+      "description": "Sent when extraction is complete with partial results",
+      "payload": {
+        "event": "session.partial",
+        "timestamp": "2025-01-19T10:35:00Z",
+        "session_id": "ses_abc123def456"
+      }
+    },
+    {
+      "event": "session.failed",
+      "description": "Sent when processing fails",
+      "payload": {
+        "event": "session.failed",
+        "timestamp": "2025-01-19T10:35:00Z",
+        "session_id": "ses_xyz789abc"
+      }
+    },
+    {
+      "event": "session.expired",
+      "description": "Sent when session times out",
+      "payload": {
+        "event": "session.expired",
+        "timestamp": "2025-01-19T11:30:00Z",
+        "session_id": "ses_expired123"
+      }
+    }
+  ],
+  "data_retrieval": {
+    "description": "After receiving a webhook, retrieve full session data via authenticated API",
+    "endpoint": "GET /sessions/{session_id}",
+    "authentication": "Required (X-API-Key or Bearer token)",
+    "documentation": "See spec/06-sessions.md and spec/09-extraction.md for response structure"
+  }
+}
