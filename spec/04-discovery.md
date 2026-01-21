@@ -169,7 +169,7 @@ Each model in the `models` array describes a service tier:
 | `display_name` | string | Yes | Human-readable name |
 | `languages` | array | Yes | ISO 639-1 language codes supported |
 | `max_session_duration_seconds` | integer | Yes | Maximum session length allowed |
-| `response_speed` | string | Yes | Processing speed: `"fast"`, `"standard"`, `"thorough"` |
+| `response_speed` | string | No | Processing speed: `"fast"`, `"standard"`, `"thorough"` |
 | `features` | object | No | Feature availability flags |
 
 ### Response Speed
