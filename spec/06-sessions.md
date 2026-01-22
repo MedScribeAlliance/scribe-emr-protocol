@@ -69,7 +69,7 @@ Creates a new voice capture session.
 ```http
 POST /sessions HTTP/1.1
 Host: api.scribe.example.com
-Authorization: X-API-Key sk_live_xxx
+Authorization: X-API-Key | sk_live_xxx
 Content-Type: application/json
 
 {
@@ -81,6 +81,75 @@ Content-Type: application/json
   "additional_data": {
     "emr_encounter_id": "enc_123",
     "emr_patient_id": "pat_456"
+  }
+}
+```
+PAYLOAD open API spec
+```
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "templates",
+    "upload_type",
+    "communication_protocol"
+  ],
+  "properties": {
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 2,
+      "description": "Derived from /templates api response in /.well-known/discovery. See discovery document for validations."
+    },
+    "model": {
+      "type": "string",
+      "enum": [
+        "pro",
+        "lite"
+      ],
+      "default": "lite"
+    },
+    "language_hint": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 2
+      },
+      "description": "IRC language codes. See discovery document for supported languages.",
+    },
+    "transcript_language": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 2
+      },
+      "default": [
+        "en"
+      ],
+      "description": "IRC language codes. See discovery document for supported languages."
+    },
+    "upload_type": {
+      "type": "string",
+      "enum": [
+        "chunked",
+        "single",
+        "stream"
+      ]
+    },
+    "communication_protocol": {
+      "type": "string",
+      "enum": [
+        "websocket",
+        "http",
+        "rpc"
+      ]
+    },
+    "additional_data": {
+      "type": "object",
+      "additionalProperties": true
+    }
   }
 }
 ```
@@ -108,6 +177,59 @@ Content-Type: application/json
   "created_at": "2025-01-19T10:30:00Z",
   "expires_at": "2025-01-19T11:30:00Z",
   "upload_url": "https://api.scribe.example.com/v1/sessions/ses_abc123def456/audio"
+}
+```
+```
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "session_id",
+    "status",
+    "created_at",
+    "expires_at",
+    "upload_url"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 32,
+      "pattern": "^ses_[a-zA-Z0-9]+$",
+      "description": "Unique identifier for the session (16 or 32 bytes string)",
+      "example": "ses_abc123def456"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "created",
+        "initialized",
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "description": "Current status of the session",
+      "example": "created"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the session was created",
+      "example": "2025-01-19T10:30:00Z"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the session will expire",
+      "example": "2025-01-19T11:30:00Z"
+    },
+    "upload_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL endpoint for uploading audio files to this session",
+      "example": "https://api.scribe.example.com/v1/sessions/ses_abc123def456/audio"
+    }
+  }
 }
 ```
 
@@ -155,7 +277,7 @@ Content-Type: application/json
 
 {
   "session_id": "ses_abc123def456",
-  "status": "processing",
+  "status": "initialized",
   "created_at": "2025-01-19T10:30:00Z",
   "expires_at": "2025-01-19T11:30:00Z",
   "audio_files_received": 3,
@@ -164,6 +286,86 @@ Content-Type: application/json
     "emr_encounter_id": "enc_123"
   },
   "transcript": "Doctor: Good morning...\nPatient: I've been having..."
+}
+```
+```
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "session_id",
+    "status",
+    "created_at",
+    "expires_at",
+    "audio_files_received",
+    "audio_files",
+    "additional_data",
+    "transcript"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 32,
+      "pattern": "^ses_[a-zA-Z0-9]+$",
+      "description": "Unique identifier for the session (16 or 32 bytes string)",
+      "example": "ses_abc123def456"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "created",
+        "initialized",
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "description": "Current status of the session",
+      "example": "initialized"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the session was created",
+      "example": "2025-01-19T10:30:00Z"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the session will expire",
+      "example": "2025-01-19T11:30:00Z"
+    },
+    "audio_files_received": {
+      "type": "integer",
+      "description": "Number of audio files received",
+      "example": 3
+    },
+    "audio_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of audio file names",
+      "example": [
+        "audio_0.webm",
+        "audio_1.webm",
+        "audio_2.webm"
+      ]
+    },
+    "additional_data": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Pass-through data returned in webhooks and responses",
+      "example": {
+        "emr_encounter_id": "enc_123"
+      }
+    },
+    "transcript": {
+      "type": "string",
+      "description": "Transcript of the audio files",
+      "example": "Doctor: Good morning...\nPatient: I've been having..."
+    }
+  }
 }
 ```
 
@@ -187,11 +389,11 @@ Content-Type: application/json
   "additional_data": {
     "emr_encounter_id": "enc_123"
   },
-  "templates": {
+  "templates": [
     "soap": {
       "status": "success",
       "data": {
-        "subjective": "...",
+        "subjective": ,
         "objective": "...",
         "assessment": "...",
         "plan": "..."
@@ -201,8 +403,161 @@ Content-Type: application/json
       "status": "success",
       "data": [...]
     }
-  },
+  ],
   "transcript": "Doctor: ...\nPatient: ..."
+}
+```
+
+```
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "session_id",
+    "status",
+    "created_at",
+    "audio_files_received",
+    "audio_files"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 32,
+      "pattern": "^ses_[a-zA-Z0-9]+$",
+      "description": "Unique identifier for the session (16 or 32 bytes string)",
+      "example": "ses_abc123def456"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "created",
+        "initialized",
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "description": "Current status of the session",
+      "example": "completed"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the session was created",
+      "example": "2025-01-19T10:30:00Z"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the session was completed",
+      "example": "2025-01-19T10:35:00Z"
+    },
+    "model_used": {
+      "type": "string",
+      "enum": [
+        "pro",
+        "lite"
+      ],
+      "description": "The model that was used for processing",
+      "example": "pro"
+    },
+    "language_detected": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 2,
+      "description": "ISO 639-1 language code detected from the audio",
+      "example": "hi"
+    },
+    "audio_files_received": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of audio files received by backend",
+      "example": 3
+    },
+    "audio_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of audio file names received",
+      "example": ["audio_0.webm", "audio_1.webm", "audio_2.webm"]
+    },
+    "additional_data": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Additional data sent by user during session initialization as raw JSON",
+      "example": {
+        "emr_encounter_id": "enc_123"
+      }
+    },
+    "templates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed",
+              "processing"
+            ],
+            "description": "Processing status of the template"
+          },
+          "data": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            ],
+            "description": "Template data - could be an object, array of objects, or nested JSON depending on the provider template response"
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message if status is failed"
+          }
+        }
+      },
+      "description": "Template processing results indexed by template_id",
+      "example": {
+        "soap": {
+          "status": "success",
+          "data": {
+            "subjective": "Patient reports headache for 3 days",
+            "objective": "BP 120/80,Temp 98.6F",
+            "assessment": "Tension headache",
+            "plan": "Prescribed ibuprofen 400mg"
+          }
+        },
+        "medications": {
+          "status": "success",
+          "data": [
+            {
+              "name": "Ibuprofen",
+              "dosage": "400mg",
+              "frequency": "twice daily"
+            }
+          ]
+        }
+      }
+    },
+    "transcript": {
+      "type": "string",
+      "description": "Full transcript of the audio conversation",
+      "example": "Doctor: Good morning, how are you feeling today?\nPatient: I've been having headaches..."
+    }
+  }
 }
 ```
 
@@ -227,7 +582,7 @@ Content-Type: application/json
   "additional_data": {
     "emr_encounter_id": "enc_123"
   },
-  "templates": {
+  "templates": [
     "soap": {
       "status": "success",
       "data": {
@@ -244,7 +599,7 @@ Content-Type: application/json
         "message": "Could not extract medication information from audio"
       }
     }
-  },
+  ],
   "transcript": "Doctor: ...\nPatient: ...",
   "processing_errors": [
     {
@@ -254,6 +609,183 @@ Content-Type: application/json
     }
   ]
 }
+```
+```
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Session Partial Processing Response",
+  "type": "object",
+  "required": [
+    "session_id",
+    "status",
+    "created_at",
+    "audio_files_received",
+    "audio_files",
+    "audio_files_processed",
+    "templates"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 32,
+      "pattern": "^ses_[a-zA-Z0-9]+$",
+      "description": "Unique identifier for the session",
+      "example": "ses_abc123def456"
+    },
+
+    "status": {
+      "type": "string",
+      "enum": ["created", "processing", "partial", "completed", "failed"],
+      "description": "Overall processing state of the session",
+      "example": "partial"
+    },
+
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when the session was created",
+      "example": "2025-01-19T10:30:00Z"
+    },
+
+    "completed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when processing completed (may be null for partial)",
+      "example": "2025-01-19T10:35:00Z"
+    },
+
+    "model_used": {
+      "type": "string",
+      "enum": ["pro", "lite"],
+      "description": "Model used to process the audio",
+      "example": "pro"
+    },
+
+    "language_detected": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 5,
+      "description": "Detected language code (ISO 639-1 or 639-3)",
+      "example": "hi"
+    },
+
+    "audio_files_received": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total audio files received",
+      "example": 3
+    },
+
+    "audio_files_processed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of audio files successfully processed",
+      "example": 2
+    },
+
+    "audio_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of uploaded audio files",
+      "example": ["audio_0.webm", "audio_1.webm", "audio_2.webm"]
+    },
+
+    "additional_data": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Arbitrary metadata provided by the client",
+      "example": {
+        "emr_encounter_id": "enc_123"
+      }
+    },
+
+    "templates": {
+      "type": "object",
+      "description": "Per-template extraction status and results",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "failed", "processing"],
+            "description": "Template processing state"
+          },
+
+          "data": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            ],
+            "description": "Extracted structured data if successful"
+          },
+
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Machine-readable error code",
+                "example": "extraction_failed"
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error description",
+                "example": "Could not extract medication information from audio"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "transcript": {
+      "type": "string",
+      "description": "Partial or full transcript of the audio session",
+      "example": "Doctor: ...\nPatient: ..."
+    },
+
+    "processing_errors": {
+      "type": "array",
+      "description": "Non-fatal processing issues",
+      "items": {
+        "type": "object",
+        "required": ["type", "message"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Category of the processing error",
+            "example": "audio_file_skipped"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description of the issue",
+            "example": "Audio file audio_2.webm skipped due to poor quality"
+          },
+          "file": {
+            "type": "string",
+            "description": "Associated file (if applicable)",
+            "example": "audio_2.webm"
+          }
+        }
+      }
+    }
+  }
+}
+
 ```
 
 **Partial Response Scenarios:**
@@ -301,6 +833,64 @@ Content-Type: application/json
     "chunk_1.webm",
     "chunk_2.webm"
   ]
+}
+```
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "End Session Response",
+  "type": "object",
+  "required": [
+    "session_id",
+    "status",
+    "message",
+    "audio_files_received",
+    "audio_files"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 32,
+      "pattern": "^ses_[a-zA-Z0-9]+$",
+      "description": "Unique identifier for the session",
+      "example": "ses_abc123def456"
+    },
+
+    "status": {
+      "type": "string",
+      "enum": ["processing"],
+      "description": "Session status after ending",
+      "example": "processing"
+    },
+
+    "message": {
+      "type": "string",
+      "description": "Human-readable status message",
+      "example": "Session ended. Processing started."
+    },
+
+    "audio_files_received": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of audio files successfully received",
+      "example": 3
+    },
+
+    "audio_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of audio file names received for this session",
+      "example": [
+        "chunk_0.webm",
+        "chunk_1.webm",
+        "chunk_2.webm"
+      ]
+    }
+  }
 }
 ```
 
@@ -378,6 +968,81 @@ Content-Type: application/json
   "transcript": null
 }
 ```
+```
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Expired Session Response",
+  "type": "object",
+  "required": [
+    "session_id",
+    "status",
+    "created_at",
+    "expired_at",
+    "message",
+    "audio_files_received",
+    "audio_files"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 32,
+      "pattern": "^ses_[a-zA-Z0-9]+$",
+      "description": "Unique identifier for the session",
+      "example": "ses_expired123"
+    },
+
+    "status": {
+      "type": "string",
+      "enum": ["expired"],
+      "description": "Session status after expiration",
+      "example": "expired"
+    },
+
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when the session was created",
+      "example": "2025-01-19T10:00:00Z"
+    },
+
+    "expired_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when the session expired",
+      "example": "2025-01-19T11:00:00Z"
+    },
+
+    "message": {
+      "type": "string",
+      "description": "Human-readable status message",
+      "example": "Session expired before processing was initiated"
+    },
+
+    "audio_files_received": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of audio files successfully received",
+      "example": 5
+    },
+
+    "audio_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of audio file names received for this session",
+      "example": [
+        "audio_0.webm",
+        "audio_1.webm",
+        "audio_2.webm",
+        "audio_3.webm",
+        "audio_4.webm"
+      ]
+    }
+  }
+}
+```
 
 If partial processing occurred before expiry, the response includes available results:
 
@@ -426,6 +1091,7 @@ Content-Type: application/json
   "transcript": "Doctor: Good morning...\nPatient: I've been having..."
 }
 ```
+
 
 ### Expired Session Response Fields
 
