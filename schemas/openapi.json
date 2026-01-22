@@ -1,0 +1,818 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "MedScribeAlliance Session API",
+        "version": "0.1.0",
+        "description": "Session lifecycle API for voice capture and extraction workflow in the MedScribeAlliance Protocol"
+    },
+    "servers": [
+        {
+            "url": "https://api.scribe.example.com/v1",
+            "description": "Production server"
+        }
+    ],
+    "security": [
+        {
+            "ApiKeyAuth": []
+        }
+    ],
+    "paths": {
+        "/sessions": {
+            "post": {
+                "summary": "Create Session",
+                "description": "Creates a new voice capture session",
+                "operationId": "createSession",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateSessionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Session created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateSessionResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/{session_id}": {
+            "get": {
+                "summary": "Get Session Status",
+                "description": "Retrieves session status and extraction results if complete",
+                "operationId": "getSessionStatus",
+                "parameters": [
+                    {
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^ses_[a-zA-Z0-9]+$"
+                        },
+                        "description": "Unique session identifier"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Session completed successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SessionCompletedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "Session is still processing",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SessionProcessingResponse"
+                                }
+                            }
+                        }
+                    },
+                    "206": {
+                        "description": "Session completed with partial results",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SessionPartialResponse"
+                                }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "Session expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ExpiredSessionResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/sessions/{session_id}/end": {
+            "post": {
+                "summary": "End Session",
+                "description": "Explicitly ends a session and triggers processing",
+                "operationId": "endSession",
+                "parameters": [
+                    {
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^ses_[a-zA-Z0-9]+$"
+                        },
+                        "description": "Unique session identifier"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Session ended, processing started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EndSessionResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "ApiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key"
+            }
+        },
+        "schemas": {
+            "CreateSessionRequest": {
+                "type": "object",
+                "required": [
+                    "templates",
+                    "upload_type",
+                    "communication_protocol"
+                ],
+                "properties": {
+                    "templates": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 2,
+                        "description": "Derived from /templates api response in /.well-known/discovery. See discovery document for validations."
+                    },
+                    "model": {
+                        "type": "string",
+                        "enum": [
+                            "pro",
+                            "lite"
+                        ],
+                        "default": "lite"
+                    },
+                    "language_hint": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 2
+                        },
+                        "description": "IRC language codes. See discovery document for supported languages."
+                    },
+                    "transcript_language": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 2
+                        },
+                        "default": [
+                            "en"
+                        ],
+                        "description": "IRC language codes. See discovery document for supported languages."
+                    },
+                    "upload_type": {
+                        "type": "string",
+                        "enum": [
+                            "chunked",
+                            "single",
+                            "stream"
+                        ]
+                    },
+                    "communication_protocol": {
+                        "type": "string",
+                        "enum": [
+                            "websocket",
+                            "http",
+                            "rpc"
+                        ]
+                    },
+                    "additional_data": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                }
+            },
+            "CreateSessionResponse": {
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "status",
+                    "created_at",
+                    "expires_at",
+                    "upload_url"
+                ],
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 32,
+                        "pattern": "^ses_[a-zA-Z0-9]+$",
+                        "description": "Unique identifier for the session (16 or 32 bytes string)",
+                        "example": "ses_abc123def456"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "created",
+                            "initialized",
+                            "processing",
+                            "completed",
+                            "failed"
+                        ],
+                        "description": "Current status of the session",
+                        "example": "created"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 timestamp when the session was created",
+                        "example": "2025-01-19T10:30:00Z"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 timestamp when the session will expire",
+                        "example": "2025-01-19T11:30:00Z"
+                    },
+                    "upload_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "URL endpoint for uploading audio files to this session",
+                        "example": "https://api.scribe.example.com/v1/sessions/ses_abc123def456/audio"
+                    }
+                }
+            },
+            "SessionProcessingResponse": {
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "status",
+                    "created_at",
+                    "expires_at",
+                    "audio_files_received",
+                    "audio_files",
+                    "additional_data",
+                    "transcript"
+                ],
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 32,
+                        "pattern": "^ses_[a-zA-Z0-9]+$",
+                        "description": "Unique identifier for the session (16 or 32 bytes string)",
+                        "example": "ses_abc123def456"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "created",
+                            "initialized",
+                            "processing",
+                            "completed",
+                            "failed"
+                        ],
+                        "description": "Current status of the session",
+                        "example": "initialized"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 timestamp when the session was created",
+                        "example": "2025-01-19T10:30:00Z"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 timestamp when the session will expire",
+                        "example": "2025-01-19T11:30:00Z"
+                    },
+                    "audio_files_received": {
+                        "type": "integer",
+                        "description": "Number of audio files received",
+                        "example": 3
+                    },
+                    "audio_files": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of audio file names",
+                        "example": [
+                            "audio_0.webm",
+                            "audio_1.webm",
+                            "audio_2.webm"
+                        ]
+                    },
+                    "additional_data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Pass-through data returned in webhooks and responses",
+                        "example": {
+                            "emr_encounter_id": "enc_123"
+                        }
+                    },
+                    "transcript": {
+                        "type": "string",
+                        "description": "Transcript of the audio files",
+                        "example": "Doctor: Good morning...\\nPatient: I've been having..."
+                    }
+                }
+            },
+            "SessionCompletedResponse": {
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "status",
+                    "created_at",
+                    "audio_files_received",
+                    "audio_files"
+                ],
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 32,
+                        "pattern": "^ses_[a-zA-Z0-9]+$",
+                        "description": "Unique identifier for the session (16 or 32 bytes string)",
+                        "example": "ses_abc123def456"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "created",
+                            "initialized",
+                            "processing",
+                            "completed",
+                            "failed"
+                        ],
+                        "description": "Current status of the session",
+                        "example": "completed"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 timestamp when the session was created",
+                        "example": "2025-01-19T10:30:00Z"
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 timestamp when the session was completed",
+                        "example": "2025-01-19T10:35:00Z"
+                    },
+                    "model_used": {
+                        "type": "string",
+                        "enum": [
+                            "pro",
+                            "lite"
+                        ],
+                        "description": "The model that was used for processing",
+                        "example": "pro"
+                    },
+                    "language_detected": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 2,
+                        "description": "ISO 639-1 language code detected from the audio",
+                        "example": "hi"
+                    },
+                    "audio_files_received": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Total number of audio files received by backend",
+                        "example": 3
+                    },
+                    "audio_files": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of audio file names received",
+                        "example": [
+                            "audio_0.webm",
+                            "audio_1.webm",
+                            "audio_2.webm"
+                        ]
+                    },
+                    "additional_data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Additional data sent by user during session initialization as raw JSON",
+                        "example": {
+                            "emr_encounter_id": "enc_123"
+                        }
+                    },
+                    "templates": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/TemplateResult"
+                        },
+                        "description": "Template processing results indexed by template_id",
+                        "example": {
+                            "soap": {
+                                "status": "success",
+                                "data": {
+                                    "subjective": "Patient reports headache for 3 days",
+                                    "objective": "BP 120/80,Temp 98.6F",
+                                    "assessment": "Tension headache",
+                                    "plan": "Prescribed ibuprofen 400mg"
+                                }
+                            },
+                            "medications": {
+                                "status": "success",
+                                "data": [
+                                    {
+                                        "name": "Ibuprofen",
+                                        "dosage": "400mg",
+                                        "frequency": "twice daily"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "transcript": {
+                        "type": "string",
+                        "description": "Full transcript of the audio conversation",
+                        "example": "Doctor: Good morning, how are you feeling today?\\nPatient: I've been having headaches..."
+                    }
+                }
+            },
+            "SessionPartialResponse": {
+                "title": "Session Partial Processing Response",
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "status",
+                    "created_at",
+                    "audio_files_received",
+                    "audio_files",
+                    "audio_files_processed",
+                    "templates"
+                ],
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 32,
+                        "pattern": "^ses_[a-zA-Z0-9]+$",
+                        "description": "Unique identifier for the session",
+                        "example": "ses_abc123def456"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "created",
+                            "processing",
+                            "partial",
+                            "completed",
+                            "failed"
+                        ],
+                        "description": "Overall processing state of the session",
+                        "example": "partial"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO-8601 timestamp when the session was created",
+                        "example": "2025-01-19T10:30:00Z"
+                    },
+                    "completed_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "Timestamp when processing completed (may be null for partial)",
+                        "example": "2025-01-19T10:35:00Z"
+                    },
+                    "model_used": {
+                        "type": "string",
+                        "enum": [
+                            "pro",
+                            "lite"
+                        ],
+                        "description": "Model used to process the audio",
+                        "example": "pro"
+                    },
+                    "language_detected": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 5,
+                        "description": "Detected language code (ISO 639-1 or 639-3)",
+                        "example": "hi"
+                    },
+                    "audio_files_received": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Total audio files received",
+                        "example": 3
+                    },
+                    "audio_files_processed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Number of audio files successfully processed",
+                        "example": 2
+                    },
+                    "audio_files": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of uploaded audio files",
+                        "example": [
+                            "audio_0.webm",
+                            "audio_1.webm",
+                            "audio_2.webm"
+                        ]
+                    },
+                    "additional_data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Arbitrary metadata provided by the client",
+                        "example": {
+                            "emr_encounter_id": "enc_123"
+                        }
+                    },
+                    "templates": {
+                        "type": "object",
+                        "description": "Per-template extraction status and results",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/TemplateResult"
+                        }
+                    },
+                    "transcript": {
+                        "type": "string",
+                        "description": "Partial or full transcript of the audio session",
+                        "example": "Doctor: ...\\nPatient: ..."
+                    },
+                    "processing_errors": {
+                        "type": "array",
+                        "description": "Non-fatal processing issues",
+                        "items": {
+                            "$ref": "#/components/schemas/ProcessingError"
+                        }
+                    }
+                }
+            },
+            "EndSessionResponse": {
+                "title": "End Session Response",
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "status",
+                    "message",
+                    "audio_files_received",
+                    "audio_files"
+                ],
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 32,
+                        "pattern": "^ses_[a-zA-Z0-9]+$",
+                        "description": "Unique identifier for the session",
+                        "example": "ses_abc123def456"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "processing"
+                        ],
+                        "description": "Session status after ending",
+                        "example": "processing"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Human-readable status message",
+                        "example": "Session ended. Processing started."
+                    },
+                    "audio_files_received": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Total number of audio files successfully received",
+                        "example": 3
+                    },
+                    "audio_files": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of audio file names received for this session",
+                        "example": [
+                            "chunk_0.webm",
+                            "chunk_1.webm",
+                            "chunk_2.webm"
+                        ]
+                    }
+                }
+            },
+            "ExpiredSessionResponse": {
+                "title": "Expired Session Response",
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "status",
+                    "created_at",
+                    "expired_at",
+                    "message",
+                    "audio_files_received",
+                    "audio_files"
+                ],
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 32,
+                        "pattern": "^ses_[a-zA-Z0-9]+$",
+                        "description": "Unique identifier for the session",
+                        "example": "ses_expired123"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "expired"
+                        ],
+                        "description": "Session status after expiration",
+                        "example": "expired"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO-8601 timestamp when the session was created",
+                        "example": "2025-01-19T10:00:00Z"
+                    },
+                    "expired_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO-8601 timestamp when the session expired",
+                        "example": "2025-01-19T11:00:00Z"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Human-readable status message",
+                        "example": "Session expired before processing was initiated"
+                    },
+                    "audio_files_received": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Total number of audio files successfully received",
+                        "example": 5
+                    },
+                    "audio_files": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of audio file names received for this session",
+                        "example": [
+                            "audio_0.webm",
+                            "audio_1.webm",
+                            "audio_2.webm",
+                            "audio_3.webm",
+                            "audio_4.webm"
+                        ]
+                    },
+                    "additional_data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "EMR pass-through data (if provided)"
+                    },
+                    "templates": {
+                        "type": "object",
+                        "description": "Empty object when no processing occurred or partial extraction results if processing started",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/TemplateResult"
+                        }
+                    },
+                    "transcript": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Null when no transcription occurred or partial transcript if transcription started"
+                    },
+                    "model_used": {
+                        "type": "string",
+                        "enum": [
+                            "pro",
+                            "lite"
+                        ],
+                        "description": "Model used for processing (if processing started)"
+                    },
+                    "language_detected": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 2,
+                        "description": "ISO 639-1 language code detected (if processing started)"
+                    },
+                    "audio_files_processed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Files processed before expiry (if processing started)"
+                    }
+                }
+            },
+            "TemplateResult": {
+                "type": "object",
+                "required": [
+                    "status"
+                ],
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "success",
+                            "failed",
+                            "processing"
+                        ],
+                        "description": "Template processing state"
+                    },
+                    "data": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "additionalProperties": true
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        ],
+                        "description": "Extracted structured data if successful"
+                    },
+                    "error": {
+                        "$ref": "#/components/schemas/TemplateError"
+                    }
+                }
+            },
+            "TemplateError": {
+                "type": "object",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Machine-readable error code",
+                        "example": "extraction_failed"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Human-readable error description",
+                        "example": "Could not extract medication information from audio"
+                    }
+                }
+            },
+            "ProcessingError": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "message"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "Category of the processing error",
+                        "example": "audio_file_skipped"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Description of the issue",
+                        "example": "Audio file audio_2.webm skipped due to poor quality"
+                    },
+                    "file": {
+                        "type": "string",
+                        "description": "Associated file (if applicable)",
+                        "example": "audio_2.webm"
+                    }
+                }
+            }
+        }
+    }
+}
