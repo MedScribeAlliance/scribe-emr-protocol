@@ -69,7 +69,7 @@ Creates a new voice capture session.
 ```http
 POST /sessions HTTP/1.1
 Host: api.scribe.example.com
-Authorization: X-API-Key | sk_live_xxx
+Authorization: Bearer <api_token>
 Content-Type: application/json
 
 {
