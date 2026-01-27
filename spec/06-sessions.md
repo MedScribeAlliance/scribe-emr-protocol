@@ -75,7 +75,7 @@ Content-Type: application/json
 {
   "templates": ["soap", "medications"],
   "model": "pro",
-  "language_hint": "hi",
+  "language_hint": ["hi"],
   "transcript_language": "en",
   "upload_type": "chunked",
   "additional_data": {
