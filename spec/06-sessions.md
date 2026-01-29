@@ -815,6 +815,32 @@ Explicitly ends a session and triggers processing.
 POST /sessions/ses_abc123def456/end HTTP/1.1
 Host: api.scribe.example.com
 Authorization: X-API-Key sk_live_xxx
+Content-Type: application/json
+
+{
+  "audio_files_sent": 3
+}
+```
+
+### Request Body Schema
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "End Session Request",
+  "type": "object",
+  "required": [
+    "audio_files_sent"
+  ],
+  "properties": {
+    "audio_files_sent": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of audio files sent by the client",
+      "example": 3
+    }
+  }
+}
 ```
 
 ### Response
@@ -906,8 +932,11 @@ Content-Type: application/json
 
 ### Important Notes
 
-- EMR clients MUST explicitly end sessions
-- Ending a session triggers processing; no more audio can be uploaded
+- EMR clients MUST explicitly end sessions by calling this endpoint
+- The `audio_files_sent` field allows the client to declare how many files it uploaded, enabling the server to detect partial uploads
+- Ending a session triggers processing; no more audio can be uploaded after this call
+- The response includes `audio_files_received` (server count) and `audio_files` (list of received filenames)
+- If `audio_files_sent` does not match `audio_files_received`, the session may be marked as `partial` during processing
 - Auto-end behavior (silence detection, etc.) is a scribe vendor capability, not protocol-mandated
 
 ---
