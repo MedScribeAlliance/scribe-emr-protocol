@@ -1,0 +1,393 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "MedScribe Alliance Discovery API",
+        "version": "0.1",
+        "description": "Discovery document for MedScribe Alliance compatible scribe services. Allows clients and EMRs to auto-configure authentication, models, languages, upload methods, and webhooks."
+    },
+    "servers": [
+        {
+            "url": "https://api.scribe.example.com"
+        }
+    ],
+    "paths": {
+        "/.well-known/medscribealliance": {
+            "get": {
+                "summary": "Discovery Document",
+                "operationId": "getDiscoveryDocument",
+                "description": "Returns service capabilities and configuration. This endpoint MUST be publicly accessible without authentication.",
+                "tags": ["discovery"],
+                "responses": {
+                    "200": {
+                        "description": "Discovery document with service capabilities",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Cache control header for discovery document",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "max-age=10800"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DiscoveryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "DiscoveryResponse": {
+                "type": "object",
+                "required": [
+                    "protocol",
+                    "protocol_version",
+                    "supported_versions",
+                    "service",
+                    "endpoints",
+                    "authentication",
+                    "capabilities",
+                    "models",
+                    "languages"
+                ],
+                "properties": {
+                    "protocol": {
+                        "type": "string",
+                        "const": "medscribealliance",
+                        "description": "Protocol identifier (must be 'medscribealliance')"
+                    },
+                    "protocol_version": {
+                        "type": "string",
+                        "example": "0.1",
+                        "description": "Current protocol version"
+                    },
+                    "supported_versions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "0.1"
+                        ],
+                        "description": "All supported protocol versions"
+                    },
+                    "service": {
+                        "$ref": "#/components/schemas/ServiceInfo"
+                    },
+                    "endpoints": {
+                        "$ref": "#/components/schemas/Endpoints"
+                    },
+                    "authentication": {
+                        "$ref": "#/components/schemas/AuthenticationConfig"
+                    },
+                    "capabilities": {
+                        "$ref": "#/components/schemas/Capabilities"
+                    },
+                    "models": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ModelConfig"
+                        },
+                        "description": "Available model configurations"
+                    },
+                    "languages": {
+                        "$ref": "#/components/schemas/LanguageConfig"
+                    }
+                }
+            },
+            "ServiceInfo": {
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Human-readable service name",
+                        "example": "Voice2Rx Medical Scribe Service"
+                    },
+                    "documentation_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Link to service documentation"
+                    },
+                    "support_email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "Support contact email"
+                    }
+                }
+            },
+            "Endpoints": {
+                "type": "object",
+                "required": [
+                    "base_url"
+                ],
+                "properties": {
+                    "base_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Base URL for API endpoints",
+                        "example": "https://api.scribe.example.com/v1"
+                    },
+                    "webhooks_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Webhook registration endpoint"
+                    },
+                    "templates_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Templates endpoint URL"
+                    }
+                }
+            },
+            "AuthenticationConfig": {
+                "type": "object",
+                "required": [
+                    "supported_methods"
+                ],
+                "properties": {
+                    "supported_methods": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "api_key",
+                                "oidc"
+                            ]
+                        },
+                        "description": "Supported auth methods: ['api_key'], ['oidc'], or both",
+                        "example": ["api_key", "oidc"]
+                    },
+                    "oidc": {
+                        "$ref": "#/components/schemas/OIDCConfig"
+                    }
+                }
+            },
+            "OIDCConfig": {
+                "type": "object",
+                "required": [
+                    "issuer",
+                    "authorization_endpoint",
+                    "token_endpoint",
+                    "scopes_supported"
+                ],
+                "properties": {
+                    "issuer": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "OIDC issuer URL"
+                    },
+                    "authorization_endpoint": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Authorization endpoint"
+                    },
+                    "token_endpoint": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Token endpoint"
+                    },
+                    "scopes_supported": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Supported OAuth scopes",
+                        "example": [
+                            "openid",
+                            "profile"
+                        ]
+                    }
+                }
+            },
+            "Capabilities": {
+                "type": "object",
+                "required": [
+                    "audio_formats",
+                    "max_chunk_duration_seconds",
+                    "upload_methods",
+                    "webhook_delivery",
+                    "client_sdk_delivery"
+                ],
+                "properties": {
+                    "audio_formats": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Supported audio MIME types",
+                        "example": [
+                            "audio/webm;codecs=opus",
+                            "audio/wav",
+                            "audio/ogg",
+                            "audio/ogg;codecs=opus",
+                            "audio/mp4",
+                            "audio/m4a",
+                            "audio/mp3"
+                        ]
+                    },
+                    "max_chunk_duration_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Maximum audio chunk duration (≤20 recommended)",
+                        "example": 20
+                    },
+                    "upload_methods": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "chunked",
+                                "single",
+                                "stream"
+                            ]
+                        },
+                        "description": "Supported upload methods",
+                        "example": ["chunked", "single", "stream"]
+                    },
+                    "webhook_delivery": {
+                        "type": "boolean",
+                        "description": "Whether webhook delivery is supported"
+                    },
+                    "client_sdk_delivery": {
+                        "type": "boolean",
+                        "description": "Whether client SDK delivery is supported"
+                    }
+                }
+            },
+            "ModelConfig": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "display_name",
+                    "languages",
+                    "max_session_duration_seconds"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "enum": [
+                            "lite",
+                            "pro"
+                        ],
+                        "description": "Unique model identifier used in API calls",
+                        "example": "pro"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "description": "Human-readable name",
+                        "example": "Professional"
+                    },
+                    "languages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "ISO 639-1 language codes supported",
+                        "example": ["en", "hi", "ta", "te"]
+                    },
+                    "max_session_duration_seconds": {
+                        "type": "integer",
+                        "description": "Maximum session length allowed",
+                        "example": 3600
+                    },
+                    "response_speed": {
+                        "type": "string",
+                        "enum": [
+                            "fast",
+                            "standard",
+                            "thorough"
+                        ],
+                        "description": "Processing speed: fast, standard, or thorough"
+                    },
+                    "features": {
+                        "$ref": "#/components/schemas/ModelFeatures"
+                    }
+                }
+            },
+            "ModelFeatures": {
+                "type": "object",
+                "properties": {
+                    "realtime_transcription": {
+                        "type": "boolean",
+                        "description": "Live transcription during recording"
+                    },
+                    "speaker_diarization": {
+                        "type": "boolean",
+                        "description": "Automatic speaker identification"
+                    },
+                    "custom_templates": {
+                        "type": "boolean",
+                        "description": "Support for custom template creation"
+                    }
+                }
+            },
+            "LanguageConfig": {
+                "type": "object",
+                "required": [
+                    "supported",
+                    "auto_detection"
+                ],
+                "properties": {
+                    "supported": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of supported ISO 639-1 language codes",
+                        "example": ["en", "hi", "ta", "te", "bn", "mr"]
+                    },
+                    "auto_detection": {
+                        "type": "boolean",
+                        "description": "Whether automatic language detection is supported"
+                    }
+                }
+            },
+            "ErrorResponse": {
+                "type": "object",
+                "required": [
+                    "error"
+                ],
+                "properties": {
+                    "error": {
+                        "type": "object",
+                        "required": [
+                            "code",
+                            "message"
+                        ],
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "description": "Machine-readable error code",
+                                "example": "internal_error"
+                            },
+                            "message": {
+                                "type": "string",
+                                "description": "Human-readable error message",
+                                "example": "Failed to generate discovery document"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
